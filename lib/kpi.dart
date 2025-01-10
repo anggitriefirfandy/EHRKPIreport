@@ -154,8 +154,7 @@ class _KPIPageState extends State<KPIPage> with SingleTickerProviderStateMixin {
                               style: const TextStyle(fontWeight: FontWeight.w500)
                             ),
                           );
-                        }).t
-                        oList(),
+                        }).toList(),
                         style: const TextStyle(color: Colors.black),
                         dropdownColor: Colors.white,
                       ),

@@ -1,17 +1,49 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:kpi/absen.dart';
 import 'package:kpi/cuti.dart';
 import 'package:kpi/elibrary.dart';
 import 'package:kpi/exam.dart';
+import 'package:kpi/handler/imageNetwork.dart';
 import 'package:kpi/kpi.dart';
 import 'package:kpi/kunjungan.dart';
 import 'package:kpi/lembur.dart';
-import 'package:kpi/pagelogin.dart'; // Assumed to have a login page
+import 'package:kpi/pagelogin.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Assumed to have a login page
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen(
+    {required this.prevPage, this.alertPop, this.infoPop, super.key});
 
+    final String prevPage;
+  final String? alertPop;
+  final String? infoPop;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+  
+  
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _username = '-';
+  Image _profimg = Image.asset(
+    'assets/images/def_img.png',
+    width: 39,
+    height: 39,
+    fit: BoxFit.fill,
+  );
+  @override
+  void initState() {
+    super.initState();
+    getuser(); // Panggil fungsi untuk memuat data pengguna
+  }
+
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,11 +89,16 @@ class HomeScreen extends StatelessWidget {
                   // Profile Row
                   Row(
                     children: [
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(left: 20),
-                        child: CircleAvatar(
-                          radius: 27,
-                          backgroundImage: AssetImage('assets/images/profile.jpeg'),
+                        child: ClipRRect(
+                         borderRadius: BorderRadius.circular(50),
+                         child: Container(
+                          width: 39,
+                          height: 39,
+                          color: Colors.white,
+                          child: _profimg,
+                          ),
                         ),
                       ),
                       Expanded(
@@ -69,9 +106,9 @@ class HomeScreen extends StatelessWidget {
                           padding: const EdgeInsets.only(left: 20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
-                                'Mawar Eva de Jongh',
+                                _username,
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 15,
@@ -370,6 +407,7 @@ class HomeScreen extends StatelessWidget {
     ),
   );
 }
+
    // Circular progress builder
   Widget _buildCircularProgress(String label, double progress) {
     return Padding(
@@ -449,5 +487,47 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+  void getuser() async {
+    SharedPreferences locStor = await SharedPreferences.getInstance();
+    var usr = locStor.getString('user');
+    print('Data user dari SharedPreferences: $usr');
+    var usrName = '-';
+    if (usr != null && usr != '') {
+      var usrDec = jsonDecode(usr);
+      usrName = usrDec['name'];
+      
+    }
+    var img = await ImageNetwork().getimageprofil();
+    if (widget.alertPop != null) {
+      AwesomeDialog(
+        context: context,
+        dialogType: DialogType.warning,
+        title: 'PERINGATAN!',
+        desc: widget.alertPop,
+        btnCancel: null,
+        btnOkOnPress: () {},
+      ).show();
+    }
+    if (widget.infoPop != null) {
+      AwesomeDialog(
+        context: context,
+        dialogType: DialogType.info,
+        title: 'INFO!',
+        desc: widget.infoPop,
+        btnCancel: null,
+        btnOkOnPress: () {},
+      ).show();
+    }
+    setState(() {
+      // _fab = FloatingButtonAttendance(currentMenu: 'home');
+      _profimg = img;
+      _username = usrName;
+      print('Username updated: $_username');
+      // _jabatan = usrJabatan;
+      // _startTime = st;
+      // _endTime = et;
+      // _menu = rowmenu;
+    });
   }
 }
