@@ -524,6 +524,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _profimg = img;
       _username = usrName;
       print('Username updated: $_username');
+      print('image updated: $img');
       // _jabatan = usrJabatan;
       // _startTime = st;
       // _endTime = et;
