@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:kpi/api/api.dart';
 
 class EmployeeLeavePage extends StatefulWidget {
   const EmployeeLeavePage({Key? key}) : super(key: key);
@@ -30,6 +33,20 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
     super.initState();
     filteredEmployees = employees;
   }
+
+  _getExamData() async {
+  var dat = await ApiHandler().getData('/cutireport');
+  if (dat.statusCode == 200 && dat.body != null) {
+    try {
+      var body = jsonDecode(dat.body);
+      // Lakukan pengolahan data di sini
+    } catch (e) {
+      print('Error decoding API data: $e');
+    }
+  } else {
+    print('Error fetching data from API: ${dat.statusCode}');
+  }
+}
 
   void filterEmployees() {
     setState(() {
