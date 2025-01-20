@@ -40,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // getuser(); // Panggil fungsi untuk memuat data pengguna
+    getuser(); // Panggil fungsi untuk memuat data pengguna
   }
 
   

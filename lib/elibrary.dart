@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class ElibraryApp extends StatefulWidget {
   const ElibraryApp({Key? key}) : super(key: key);
@@ -8,12 +10,7 @@ class ElibraryApp extends StatefulWidget {
 }
 
 class _ElibraryAppState extends State<ElibraryApp> {
-  final List<String> branches = [
-    'All',
-    'Kantor Pusat',
-    'Kantor Cabang 1',
-    'Kantor Cabang 2'
-  ];
+  final List<String> branches = ['All', 'EHR System', 'Other Branch'];
   final List<String> months = [
     'All',
     'January',
@@ -32,45 +29,61 @@ class _ElibraryAppState extends State<ElibraryApp> {
 
   String selectedBranch = 'All';
   String selectedMonth = 'All';
+  List<Employee> employees = [];
+  bool isLoading = true;
 
-  final List<Map<String, dynamic>> employees = [
-    {
-      "name": "Mawar Eva de Jongh",
-      "accessCount": "3 kali",
-      "position": "Front end Developer",
-      "nip": "0988767656s657897",
-      "age": "25 Tahun",
-      "office": "Kantor Pusat Operasional",
-      "books": [
-        {"title": "Managing the digital: paradigms Leadership & organization", "count": "2 kali"},
-        {"title": "Literature, science and public policy from Darwin to genomics", "count": "1 kali"},
-      ]
-    },
-    {
-      "name": "Bryan Domani",
-      "accessCount": "5 kali",
-      "position": "Backend Developer",
-      "nip": "1234567890",
-      "age": "30 Tahun",
-      "office": "Kantor Cabang 1",
-      "books": [
-        {"title": "Understanding AI: Principles and Applications", "count": "3 kali"},
-        {"title": "Data Science for Beginners", "count": "2 kali"},
-      ]
-    },
-    {
-      "name": "Iqbal Ramadhan",
-      "accessCount": "7 kali",
-      "position": "Data Scientist",
-      "nip": "0987654321",
-      "age": "28 Tahun",
-      "office": "Kantor Cabang 2",
-      "books": [
-        {"title": "Machine Learning Basics", "count": "4 kali"},
-        {"title": "Deep Learning Explained", "count": "2 kali"},
-      ]
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    fetchLibraryData();
+  }
+
+  Future<void> fetchLibraryData() async {
+    const apiUrl = 'https://your.domainnamegoeshere.xyz/api/ehrreport/libraryreport';
+    try {
+      var response = await http.get(
+        Uri.parse(apiUrl),
+        headers: {
+          'Authorization': 'Bearer 87718|Nya4lvosf7a5yt1VtZqZNey7PHOI9eoI2CU3LQUk5aade454', // Ganti dengan token yang valid
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+
+        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
+          final List<dynamic> data = jsonResponse['data'];
+          List<Employee> employeeList = data.map((item) => Employee.fromJson(item)).toList();
+
+          setState(() {
+            employees = employeeList;
+            isLoading = false;
+          });
+        } else {
+          throw Exception('Invalid data format');
+        }
+      } else {
+        throw Exception('Failed to load data');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching data: $e')),
+      );
+    }
+  }
+  Widget tableCellWithIcon(IconData iconData, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: IconButton(
+        icon: Icon(iconData, color: const Color(0xFF007BFF)),
+        onPressed: onTap,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,139 +100,150 @@ class _ElibraryAppState extends State<ElibraryApp> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: EmployeeSearchDelegate(employees), // Call the search delegate
-              );
-            },
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: fetchLibraryData,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Cabang:', style: TextStyle(fontSize: 14)),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedBranch,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedBranch = newValue ?? 'All';
-                          });
-                        },
-                        items: branches
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, style: const TextStyle(fontSize: 14)),
-                          );
-                        }).toList(),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : employees.isEmpty
+              ? const Center(child: Text('No data available'))
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Cabang:', style: TextStyle(fontSize: 14)),
+                                DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: selectedBranch,
+                                  onChanged: (String? newValue) {
+                                    setState(() {
+                                      selectedBranch = newValue ?? 'All';
+                                    });
+                                  },
+                                  items: branches
+                                      .map<DropdownMenuItem<String>>((String value) {
+                                    return DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value, style: const TextStyle(fontSize: 14)),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Bulan:', style: TextStyle(fontSize: 14)),
+                                DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: selectedMonth,
+                                  onChanged: (String? newValue) {
+                                    setState(() {
+                                      selectedMonth = newValue ?? 'All';
+                                    });
+                                  },
+                                  items: months
+                                      .map<DropdownMenuItem<String>>((String value) {
+                                    return DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value, style: const TextStyle(fontSize: 14)),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Bulan:', style: TextStyle(fontSize: 14)),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedMonth,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedMonth = newValue ?? 'All';
-                          });
-                        },
-                        items: months
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, style: const TextStyle(fontSize: 14)),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'List Akses Perpustakaan',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: Table(
-                      border: TableBorder.all(color: Colors.grey),
-                      columnWidths: const {
-                        0: FixedColumnWidth(40), // Kolom 'No', ukuran tetap
-                        1: FixedColumnWidth(100), // Kolom 'Nama', ukuran tetap
-                        2: FixedColumnWidth(100), // Kolom 'Akses Elibrary', ukuran tetap
-                        3: FixedColumnWidth(60),  // Kolom 'Detail', ukuran tetap
-                      },
-                      children: [
-                        // Header dengan latar belakang biru muda
-                        TableRow(
-                          decoration: BoxDecoration(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'List Akses Perpustakaan',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Table(
+                          border: TableBorder.all(color: Colors.grey),
+                          columnWidths: const {
+                            0: FixedColumnWidth(40), // Kolom 'No', ukuran tetap
+                            1: FixedColumnWidth(100), // Kolom 'Nama', ukuran tetap
+                            2: FixedColumnWidth(100), // Kolom 'Akses Elibrary', ukuran tetap
+                            3: FixedColumnWidth(100), // Kolom 'Detail', ukuran tetap
+                          },
                           children: [
-                            tableCell('No', isHeader: true),
-                            tableCell('Nama', isHeader: true),
-                            tableCell('Akses Elibrary', isHeader: true),
-                            tableCell('Detail', isHeader: true),
+                            TableRow(
+                              decoration: BoxDecoration(color: Colors.grey),
+                              children: [
+                                tableCell('No', isHeader: true),
+                                tableCell('Nama', isHeader: true),
+                                tableCell('Request Download', isHeader: true),
+                                tableCell('Detail', isHeader: true),
+                              ],
+                            ),
+                            ..._getUniqueEmployees().asMap().entries.map((entry) {
+                              int index = entry.key + 1;
+                              Employee employee = entry.value;
+                              int accessCount = _getAccessCount(employee.nama);
+                              return TableRow(
+                                children: [
+                                  tableCell(index.toString()),
+                                  tableCell(employee.nama),
+                                  tableCell(accessCount.toString()),
+                                 tableCellWithIcon(
+                                    Icons.document_scanner_outlined,
+                                    () {
+                                      // Mengirim data employee ke halaman DetailPage
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => DetailPage(employee: employee),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              );
+                            }).toList(),
                           ],
                         ),
-                        // Baris data pegawai
-                        ...employees.asMap().entries.map((entry) {
-                          int index = entry.key + 1;
-                          Map<String, dynamic> employee = entry.value;
-                          return TableRow(
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                            ),
-                            children: [
-                              tableCell(index.toString()), // Kolom No
-                              tableCell(employee['name']), // Kolom Nama
-                              tableCell(employee['accessCount']), // Kolom Akses Elibrary
-                              tableCellWithIcon(Icons.description, () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => DetailPage(employee: employee),
-                                  ),
-                                );
-                              }), // Kolom Detail
-                            ],
-                          );
-                        }).toList(),
-                      ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+                  ],
+                ),
     );
+  }
+
+  // Mengambil daftar unik berdasarkan nama
+  List<Employee> _getUniqueEmployees() {
+    final Set<String> seenNames = {};
+    final List<Employee> uniqueEmployees = [];
+
+    for (var employee in employees) {
+      if (!seenNames.contains(employee.nama)) {
+        seenNames.add(employee.nama);
+        uniqueEmployees.add(employee);
+      }
+    }
+    return uniqueEmployees;
+  }
+
+  // Menghitung berapa kali nama muncul
+  int _getAccessCount(String name) {
+    return employees.where((employee) => employee.nama == name).length;
   }
 
   Widget tableCell(String text, {bool isHeader = false}) {
@@ -229,113 +253,59 @@ class _ElibraryAppState extends State<ElibraryApp> {
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 14, // Set font size to 14
+          fontSize: 14,
           fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-          color: isHeader ? Colors.black : Colors.black87,
         ),
       ),
     );
   }
-
-  Widget tableCellWithIcon(IconData iconData, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: IconButton(
-        icon: Icon(iconData, color: const Color(0xFF007BFF)),
-        onPressed: onTap,
-      ),
-    );
-  }
 }
 
-class EmployeeSearchDelegate extends SearchDelegate {
-  final List<Map<String, dynamic>> employees;
+class Employee {
+  final String nama;
+  final String jabatan;
+  final String usia;
+  final String nip;
+  final String namaBuku;
+  final String kantorCabang;
 
-  EmployeeSearchDelegate(this.employees);
+  Employee({
+    required this.nama,
+    required this.jabatan,
+    required this.usia,
+    required this.nip,
+    required this.namaBuku,
+    required this.kantorCabang,
+  });
 
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, null);
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    List<Map<String, dynamic>> matchQuery = [];
-    for (var employee in employees) {
-      if (employee['name'].toLowerCase().contains(query.toLowerCase())) {
-        matchQuery.add(employee);
-      }
-    }
-
-    return ListView.builder(
-      itemCount: matchQuery.length,
-      itemBuilder: (context, index) {
-        var result = matchQuery[index];
-        return ListTile(
-          title: Text(result['name']),
-          subtitle: Text(result['position']),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DetailPage(employee: result),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    List<Map<String, dynamic>> matchQuery = [];
-    for (var employee in employees) {
-      if (employee['name'].toLowerCase().contains(query.toLowerCase())) {
-        matchQuery.add(employee);
-      }
-    }
-
-    return ListView.builder(
-      itemCount: matchQuery.length,
-      itemBuilder: (context, index) {
-        var result = matchQuery[index];
-        return ListTile(
-          title: Text(result['name']),
-          subtitle: Text(result['position']),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DetailPage(employee: result),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+  factory Employee.fromJson(Map<String, dynamic> json) {
+  return Employee(
+    nama: json['nama'] ?? '',  // Pastikan ini adalah string
+    jabatan: json['jabatan'] ?? '',  // Pastikan ini adalah string
+    usia: json['usia'].toString(),  // Ubah usia menjadi string jika di API bertipe int
+    nip: json['nip'].toString(),  // Ubah nip menjadi string jika di API bertipe int
+    namaBuku: json['nama_buku'] ?? '',  // Pastikan ini adalah string
+    kantorCabang: json['kantor_cabang'] ?? '',  // Pastikan ini adalah string
+  );
 }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class DetailPage extends StatelessWidget {
-  final Map<String, dynamic> employee; // Accepts the employee data
+  final Employee employee;
 
   const DetailPage({Key? key, required this.employee}) : super(key: key);
 
@@ -374,50 +344,35 @@ class DetailPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      employee['name'] ?? 'N/A',
+                      employee.nama,
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      employee['position'] ?? 'N/A',
+                      employee.jabatan,
                       style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF007BFF),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text('NIP: ${employee['nip'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-                    Text('Usia : ${employee['age'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-                    Text('Kantor : ${employee['office'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
+                    Text('Cabang: ${employee.kantorCabang}'),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          'INDEX RATA-RATA KPI 4.0',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF007BFF),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Row(
-                          children: const [
-                            Icon(Icons.star, color: Colors.amber, size: 14),
-                            Icon(Icons.star, color: Colors.amber, size: 14),
-                            Icon(Icons.star, color: Colors.amber, size: 14),
-                            Icon(Icons.star, color: Colors.amber, size: 14),
-                            Icon(Icons.star_border, color: Colors.amber, size: 14),
-                          ],
-                        ),
-                      ],
-                    ),
+                    Text('Usia: ${employee.usia}'),
+                    const SizedBox(height: 4),
+                    Text('NIP: ${employee.nip}'),
                   ],
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            // Book list section
+            // Buku yang dipinjam
+            const Text(
+              'Buku yang dipinjam',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            // Menampilkan buku yang dipinjam oleh karyawan
             Table(
               border: TableBorder.all(color: Colors.grey),
               columnWidths: const {
@@ -434,17 +389,13 @@ class DetailPage extends StatelessWidget {
                     tableCell('Jumlah', isHeader: true),
                   ],
                 ),
-                ...employee['books'].asMap().entries.map<TableRow>((entry) {
-                  int index = entry.key + 1;
-                  Map<String, dynamic> book = entry.value;
-                  return TableRow(
-                    children: [
-                      tableCell('$index'),
-                      tableCell(book['title']),
-                      tableCell(book['count']),
-                    ],
-                  );
-                }).toList(),
+                TableRow(
+                  children: [
+                    tableCell('1'),
+                    tableCell(employee.namaBuku), // Nama buku yang dipinjam
+                    tableCell('1'), // Anggap hanya 1 buku yang dipinjam
+                  ],
+                ),
               ],
             ),
           ],
@@ -460,7 +411,7 @@ class DetailPage extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 14, // Set font size to 14
+          fontSize: 14,
           fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
         ),
       ),

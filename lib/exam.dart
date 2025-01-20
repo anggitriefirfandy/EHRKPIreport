@@ -240,8 +240,8 @@ class _ExamAppState extends State<ExamApp> {
                 0: FixedColumnWidth(40),
                 1: FixedColumnWidth(100),
                 2: FixedColumnWidth(100),
-                3: FixedColumnWidth(60),
-                4: FixedColumnWidth(60),
+                3: FixedColumnWidth(100),
+               
               },
               children: [
                 TableRow(
@@ -250,7 +250,7 @@ class _ExamAppState extends State<ExamApp> {
                     tableCell('No', isHeader: true),
                     tableCell('Nama', isHeader: true),
                     tableCell('Jabatan', isHeader: true),
-                    tableCell('Materi', isHeader: true),
+                   
                     tableCell('Skor', isHeader: true),
                   ],
                 ),
@@ -261,25 +261,27 @@ class _ExamAppState extends State<ExamApp> {
   children: [
     tableCell(index.toString()),
     // Pastikan data yang dikirim ke DetailPage berisi materi yang valid
+// Bagian onTap di ExamApp (ketika nama diklik)
 GestureDetector(
   onTap: () {
-    // Menavigasi ke halaman DetailPage dan mengirimkan data terkait
+    // Menavigasi ke halaman DetailPage dan mengirimkan nama pegawai
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => DetailPage(
-          employee: employee, // Mengirim data pegawai
-          materiList: employee['materi'] ?? [], // Pastikan materiList tidak null
+          employeeName: employee['nama'] ?? 'N/A', // Mengirim nama pegawai
         ),
       ),
     );
   },
-  child: tableCell(employee['nama'] ?? 'N/A'), // Nama
+  child: tableCell(employee['nama'] ?? 'N/A'),
 ),
 
 
+
+
+
     tableCell(employee['jabatan'] ?? 'N/A'),
-    tableCell(employee['kategori'] ?? 'N/A'),
     tableCell(employee['nilai'] ?? 'N/A'),
   ],
 );
@@ -313,109 +315,179 @@ GestureDetector(
 }
 
 
-class DetailPage extends StatelessWidget {
-  final Map<String, dynamic> employee;
-  final List<Map<String, dynamic>> materiList;
+class DetailPage extends StatefulWidget {
+  final String employeeName; // Menambahkan parameter untuk menerima nama
 
-  const DetailPage({Key? key, required this.employee, required this.materiList}) : super(key: key);
+  const DetailPage({Key? key, required this.employeeName}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Detail',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF007BFF),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  _DetailPageState createState() => _DetailPageState();
+}
+
+class _DetailPageState extends State<DetailPage> {
+  List<Map<String, dynamic>> employees = []; // Data pegawai yang akan ditampilkan
+  bool isLoading = true; // Indikator loading
+
+  @override
+  void initState() {
+    super.initState();
+    fetchEmployeeData(); // Memuat data pegawai berdasarkan nama yang diterima
+  }
+
+  Future<void> fetchEmployeeData() async {
+    const String url = 'https://your.domainnamegoeshere.xyz/api/ehrreport/examreport';
+    try {
+      var response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer 87718|Nya4lvosf7a5yt1VtZqZNey7PHOI9eoI2CU3LQUk5aade454',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
+          final List<dynamic> data = jsonResponse['data'];
+
+          // Mengonversi List<dynamic> menjadi List<Map<String, dynamic>>
+          List<Map<String, dynamic>> employeeData = data
+              .map<Map<String, dynamic>>((item) => item as Map<String, dynamic>)
+              .toList();
+
+          // Menyaring data berdasarkan nama yang diterima
+          List<Map<String, dynamic>> filteredEmployeeData = employeeData
+              .where((item) => item['nama'] == widget.employeeName) // Hanya menampilkan data yang sesuai
+              .toList();
+
+          setState(() {
+            employees = filteredEmployeeData; // Menyimpan data yang sudah disaring
+            isLoading = false; // Menandakan bahwa data sudah dimuat
+          });
+        } else {
+          print("Format data tidak valid");
+        }
+      } else {
+        print("Gagal memuat data: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Terjadi kesalahan: $e");
+    }
+  }
+
+  @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Detail'),
+      backgroundColor: const Color(0xFF007BFF),
+      centerTitle: true,
+    ),
+    body: isLoading
+        ? const Center(child: CircularProgressIndicator()) // Loading indicator
+        : SingleChildScrollView(
+            child: Column(
               children: [
-                const CircleAvatar(
-                  radius: 40,
-                  backgroundImage: AssetImage('assets/images/profile.jpeg'),
+                // Employee profile details
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        employees.isNotEmpty
+                            ? employees[0]['nama'] ?? 'N/A'
+                            : 'N/A',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        employees.isNotEmpty
+                            ? employees[0]['jabatan'] ?? 'N/A'
+                            : 'N/A',
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF007BFF)),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'NIP: ${employees.isNotEmpty ? employees[0]['nip'] ?? 'N/A' : 'N/A'}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        'Usia: ${employees.isNotEmpty ? employees[0]['usia'] ?? 'N/A' : 'N/A'} Tahun',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        'Kantor: ${employees.isNotEmpty ? employees[0]['kantor_cabang'] ?? 'N/A' : 'N/A'}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Text(
+                            'INDEX RATA-RATA KPI 4.0',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF007BFF),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Row(
+                            children: const [
+                              Icon(Icons.star, color: Colors.amber, size: 15),
+                              Icon(Icons.star, color: Colors.amber, size: 15),
+                              Icon(Icons.star, color: Colors.amber, size: 15),
+                              Icon(Icons.star, color: Colors.amber, size: 15),
+                              Icon(Icons.star_border, color: Colors.amber, size: 15),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 16),
+                // Table for displaying exam details
+                Table(
+                  border: TableBorder.all(color: Colors.grey),
+                  columnWidths: const {
+                    0: FixedColumnWidth(50), // Ubah lebar kolom No
+                    1: FixedColumnWidth(110), // Ubah lebar kolom Tanggal
+                    2: FixedColumnWidth(145), // Ubah lebar kolom Materi
+                    3: FixedColumnWidth(60), // Ubah lebar kolom Skor
+                  },
                   children: [
-                    Text(
-                      employee['nama'] ?? 'N/A',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    TableRow(
+                      decoration: BoxDecoration(color: Colors.blue[50]),
+                      children: [
+                        tableCell('No', isHeader: true),
+                        tableCell('Tanggal', isHeader: true),
+                        tableCell('Materi', isHeader: true),
+                        tableCell('Skor', isHeader: true),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      employee['jabatan'] ?? 'N/A',
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF007BFF)),
-                    ),
+                    // Displaying filtered data based on the selected employee
+                    ...employees.asMap().entries.map((entry) {
+                      int index = entry.key + 1;
+                      Map<String, dynamic> employee = entry.value;
+                      return TableRow(
+                        children: [
+                          tableCell(index.toString()), // No
+                          tableCell(employee['tanggal_pengisian'] ?? 'N/A'), // Tanggal
+                          tableCell(employee['kategori'] ?? 'N/A'), // Materi
+                          tableCell(employee['nilai'] ?? 'N/A'), // Skor
+                        ],
+                      );
+                    }).toList(),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Table(
-  border: TableBorder.all(color: Colors.grey),
-  columnWidths: const {
-    0: FixedColumnWidth(50), // Ubah lebar kolom No
-    1: FixedColumnWidth(110), // Ubah lebar kolom Tanggal
-    2: FixedColumnWidth(145), // Ubah lebar kolom Materi
-    3: FixedColumnWidth(60), // Ubah lebar kolom Skor
-  },
-  children: [
-    TableRow(
-      decoration: BoxDecoration(color: Colors.blue[50]),
-      children: [
-        tableCell('No', isHeader: true),
-        tableCell('Tanggal', isHeader: true),
-        tableCell('Materi', isHeader: true),
-        tableCell('Skor', isHeader: true),
-      ],
-    ),
-    ...materiList.map((materiData) {
-      return TableRow(
-        children: [
-          tableCell(materiData['no']?.toString() ?? 'N/A'), // No
-          tableCell(materiData['tanggal'] ?? 'N/A'), // Tanggal
-          GestureDetector(
-            onTap: () {
-              // Navigasi ke DetailPage saat Materi diklik
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DetailPage(
-                    employee: employee,
-                    materiList: materiList, // Kirim data materi
-                  ),
-                ),
-              );
-            },
-            child: tableCell(materiData['materi'] ?? 'N/A'), // Materi
           ),
-          tableCell(materiData['skor']?.toString() ?? 'N/A'), // Skor
-        ],
-      );
-    }).toList(),
-  ],
-)
-
-          ],
-        ),
-      ),
-    );
-  }
+  );
+}
 
   Widget tableCell(String text, {bool isHeader = false}) {
     return Padding(
@@ -424,18 +496,10 @@ class DetailPage extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 14,
+          fontSize: 14, // Ubah ukuran font menjadi 14
           fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
         ),
       ),
     );
   }
 }
-
-
-
-// void main() {
-//   runApp(const MaterialApp(
-//     home: ExamApp(),
-//   ));
-// }
