@@ -18,7 +18,7 @@ import 'package:awesome_dialog/awesome_dialog.dart';
 
 
 class ApiHandler {
-  String _apiurl = 'https://your.domainnamegoeshere.xyz/api/v1';
+  String _apiurl = 'https://your.domainnamegoeshere.xyz/api/ehrreport';
 
   String _token = '';
   String _devid = '';
@@ -52,10 +52,19 @@ class ApiHandler {
         locStor.getString('token') != '' &&
         locStor.getString('token') != 'null') {
       _token = jsonDecode(locStor.getString('token') ?? '')['token'];
-      log(_token.toString());
+      // log(_token.toString());
     } else {
       _token = '';
     }
+    //  String? rawToken = locStor.getString('token');
+
+// if (rawToken != null && rawToken.isNotEmpty && rawToken != 'null') {
+//   _token = rawToken; // Gunakan token mentah langsung
+//   log('Token: $_token');
+// } else {
+//   _token = '';
+//   print('Token is null or empty');
+// }
     String? deviceId = await PlatformDeviceId.getDeviceId;
     if (deviceId != null) {
       _devid = deviceId;

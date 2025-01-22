@@ -1,16 +1,100 @@
 import 'dart:convert';
+import 'dart:developer';
 
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kpi/api/api.dart';
 import 'package:kpi/halamanutama.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  bool _isLoading = false;
+  int _constat = 1; // Misalnya, 1 berarti koneksi tersedia
+  String _errorMessage = '';
+
+  // Fungsi login
+  void _login() async {
+    print('mulai login');
+    if (_constat == 0) {
+      AwesomeDialog(
+        context: context,
+        dialogType: DialogType.infoReverse,
+        headerAnimationLoop: false,
+        animType: AnimType.bottomSlide,
+        title: 'INFO',
+        desc: 'Login hanya bisa dilakukan saat indikator koneksi berwarna hijau',
+      ).show();
+    } else if (!_isLoading) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      String email = emailController.text.trim();
+      String password = passwordController.text.trim();
+
+      if (email.isEmpty || password.isEmpty) {
+        Fluttertoast.showToast(msg: "Email dan password tidak boleh kosong.");
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      var data = {'email': email, 'password': password, 'device': 'Mobile EHR'};
+      var res = await ApiHandler().authData(data, '/login');
+      var body = jsonDecode(res.body);
+
+      if (res.statusCode == 200 && body['success']) {
+        SharedPreferences locStor = await SharedPreferences.getInstance();
+        locStor.setString('token', jsonEncode(body['token']));
+        locStor.setString('user', jsonEncode(body['user']));
+        log("Token disimpan: ${body['token']}");
+
+        String? infmsg = body['infomessage']?.toString();
+        String? alrmsg = body['alertmessage']?.toString();
+
+        Get.off(() => HomeScreen(
+              prevPage: '',
+              infoPop: infmsg,
+              alertPop: alrmsg,
+            ));
+      } else {
+        String m = body['message'].toString();
+        if (m.toLowerCase().contains('server error') ||
+            m.toLowerCase().contains('timed out')) {
+          m = 'Koneksi Bermasalah';
+        }
+        AwesomeDialog(
+          context: context,
+          dialogType: DialogType.infoReverse,
+          headerAnimationLoop: false,
+          animType: AnimType.bottomSlide,
+          title: 'INFO',
+          desc: m,
+        ).show();
+        setState(() {
+          _errorMessage = m;
+        });
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,8 +187,8 @@ class LoginPage extends StatelessWidget {
 
   // Function to show login bottom sheet
   void _showLoginBottomSheet(BuildContext context) {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  // final TextEditingController emailController = TextEditingController();
+  // final TextEditingController passwordController = TextEditingController();
 
   bool _isObscure = true; // Password visibility state
 
@@ -161,7 +245,7 @@ class LoginPage extends StatelessWidget {
                   SizedBox(height: 15),
                   TextField(
                     controller: passwordController,
-                    obscureText: _isObscure,
+                    obscureText: true,
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.lock),
                       suffixIcon: IconButton(
@@ -180,94 +264,27 @@ class LoginPage extends StatelessWidget {
                   ),
                   SizedBox(height: 30),
                   ElevatedButton(
-                    onPressed: () async {
-                      String email = emailController.text.trim();
-                      String password = passwordController.text.trim();
-
-                      if (email.isEmpty || password.isEmpty) {
-                        Fluttertoast.showToast(
-                          msg: "Email dan password tidak boleh kosong.",
-                        );
-                        return;
-                      }
-
-                      // Tampilkan loading
-                      EasyLoading.show(status: 'Loading...');
-                       print("Attempting to login with email: $email");
-
-                      try {
-                        ApiHandler apiHandler = ApiHandler();
-                        var response = await apiHandler.authData(
-                          {
-                            'email': email,
-                            'password': password,
-                            'device': 'Mobile EHR',
-                          },
-                          '/login', // Endpoint API untuk login
-                        );
-
-                        // Log response status dan body
-                        print("Response Status: ${response.statusCode}");
-                        print("Response Body: ${response.body}");
-
-                        // Parsing respons
-                        var responseBody = jsonDecode(response.body);
-                        if (response.statusCode == 200 &&
-                            responseBody['success'] == true) {
-                          // Login berhasil
-                            print("Login successful");
-                            // Mengambil token dari respons API
-                            String token = responseBody['token']['token']; // Sesuaikan dengan struktur data yang benar
-                            Map<String, dynamic> user = responseBody['user']; // Sesuaikan dengan struktur respons Anda
-
-                            // Simpan token dan data pengguna ke SharedPreferences
-                            SharedPreferences prefs = await SharedPreferences.getInstance();
-                            await prefs.setString('token', token);
-                            await prefs.setString('user', jsonEncode(user)); // Simpan data pengguna dalam format JSON
-                            
-
-                          EasyLoading.dismiss();
-                          Fluttertoast.showToast(msg: "Login berhasil!");
-
-                          // Navigasi ke halaman HomeScreen
-                          Navigator.of(context).pop();
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => const HomeScreen(prevPage: '',),
-                            ),
-                          );
-                        } else {
-                          print("Login failed: ${responseBody['message']}");
-                          EasyLoading.dismiss();
-                          Fluttertoast.showToast(
-                            msg: responseBody['message'] ??
-                                'Login gagal, periksa kredensial Anda.',
-                          );
-                        }
-                      } catch (e) {
-                        print("Error during login: $e");
-                        EasyLoading.dismiss();
-                        Fluttertoast.showToast(
-                          msg: 'Terjadi kesalahan: $e',
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Color(0xFF007BFF),
-                      minimumSize: Size(200, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      'Login',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  onPressed: _login, // Panggil fungsi login di sini
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: const Color(0xFF007BFF),
+                    minimumSize: const Size(200, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                      : Text(
+                          'Login',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
                   SizedBox(height: 20),
                 ],
               ),

@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:kpi/api/api.dart';
 
 class ElibraryApp extends StatefulWidget {
   const ElibraryApp({Key? key}) : super(key: key);
@@ -10,69 +13,126 @@ class ElibraryApp extends StatefulWidget {
 }
 
 class _ElibraryAppState extends State<ElibraryApp> {
-  final List<String> branches = ['All', 'EHR System', 'Other Branch'];
+  late Future<List<Employee>> futureEmployee;
+  List<Employee> allLibraryData = [];
+  List<Employee> filteredLibraryData = [];
+  List<Employee> paginatedLibraryData = [];
+   int currentPage = 1;
+  final int itemsPerPage = 10; // Jumlah data per halaman
+  List<String> branches = ['Semua Cabang'];
+  int totalPages = 1;
   final List<String> months = [
-    'All',
-    'January',
-    'February',
-    'March',
+    'Semua Bulan',
+    'Januari',
+    'Februari',
+    'Maret',
     'April',
-    'May',
-    'June',
-    'July',
-    'August',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
     'September',
-    'October',
+    'Oktober',
     'November',
-    'December'
+    'Desember'
   ];
 
-  String selectedBranch = 'All';
-  String selectedMonth = 'All';
+  String selectedBranch = 'Semua Cabang';
+  String selectedMonth = 'Semua Bulan';
   List<Employee> employees = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    fetchLibraryData();
+    futureEmployee = getLibraryData();
   }
-
-  Future<void> fetchLibraryData() async {
-    const apiUrl = 'https://your.domainnamegoeshere.xyz/api/ehrreport/libraryreport';
+  Future<List<Employee>> getLibraryData() async {
+    
     try {
-      var response = await http.get(
-        Uri.parse(apiUrl),
-        headers: {
-          'Authorization': 'Bearer 87718|Nya4lvosf7a5yt1VtZqZNey7PHOI9eoI2CU3LQUk5aade454', // Ganti dengan token yang valid
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-
-        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
+      String month = months.indexOf(selectedMonth).toString(); // Mendapatkan bulan sebagai string
+    String year = DateTime.now().year.toString();
+      var url = '/libraryreport?month=$month&year=$year';
+      print('Fetching data with filters - Month: $month, Year: $year'); 
+      var dat = await ApiHandler().getData(url);
+    //    print('Status Code: ${dat.statusCode}');
+    // print('Response Body: ${dat.body}');
+      if (dat.statusCode == 200 && dat.body != null) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+        print('Decoded JSON: $jsonResponse');
+        if (jsonResponse.containsKey('data')&& jsonResponse['data'] is List) {
           final List<dynamic> data = jsonResponse['data'];
-          List<Employee> employeeList = data.map((item) => Employee.fromJson(item)).toList();
+           print('Raw Data: $data');
+          List<Employee> libraryDataList = 
+          data.map((item) => Employee.fromJson(item)).toList();
+          libraryDataList.sort((a, b) => a.nama.compareTo(b.nama));
 
+          final branchSet = <String>{'Semua Cabang'};
+          for (var libraryData in libraryDataList) {
+            branchSet.add(libraryData.kantorCabang);
+          }
           setState(() {
-            employees = employeeList;
+            branches = branchSet.toList();
+            allLibraryData = libraryDataList;
+            filteredLibraryData = libraryDataList;
+            totalPages = (filteredLibraryData.length / itemsPerPage).ceil();
+            updatePaginatedData();
             isLoading = false;
+            employees = libraryDataList;
           });
-        } else {
-          throw Exception('Invalid data format');
+          return libraryDataList;
+        }else {
+          throw Exception('invalid data format');
         }
-      } else {
-        throw Exception('Failed to load data');
+      }else {
+        throw Exception('Failed to fetch library data. status code: ${dat.statusCode}');
       }
     } catch (e) {
+      Fluttertoast.showToast(msg: 'Eror: $e');
+      return [];
+    }
+  }
+
+  void applyFilter() {
+  setState(() {
+    filteredLibraryData = allLibraryData.where((library) {
+      bool matchesBranch = selectedBranch == 'Semua Cabang' || library.kantorCabang == selectedBranch;
+      bool matchesMonth = selectedMonth == 'Semua Bulan' || 
+          DateTime.parse(library.created_at).month == months.indexOf(selectedMonth);
+      return matchesBranch && matchesMonth;
+    }).toList();
+    filteredLibraryData.sort((a, b) => a.nama.compareTo(b.nama)); // Urutkan berdasarkan nama
+    currentPage = 1;
+    totalPages = (filteredLibraryData.length / itemsPerPage).ceil();
+    updatePaginatedData();
+  });
+  print('Applied Filters: Branch - $selectedBranch, Month - $selectedMonth');
+  print('Filtered Data Count: ${filteredLibraryData.length}');
+}
+
+  void updatePaginatedData() {
+  int startIndex = (currentPage - 1) * itemsPerPage;
+  int endIndex = startIndex + itemsPerPage;
+
+  setState(() {
+    paginatedLibraryData = filteredLibraryData.sublist(startIndex, endIndex.clamp(0, filteredLibraryData.length));
+  });
+}
+
+  void goToNextPage() {
+    if (currentPage < totalPages) {
       setState(() {
-        isLoading = false;
+        currentPage++;
+        updatePaginatedData();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching data: $e')),
-      );
+    }
+  }
+  void goToPreviousPage() {
+    if (currentPage > 1) {
+      setState(() {
+        currentPage--;
+        updatePaginatedData();
+      });
     }
   }
   Widget tableCellWithIcon(IconData iconData, VoidCallback onTap) {
@@ -101,7 +161,7 @@ class _ElibraryAppState extends State<ElibraryApp> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: fetchLibraryData,
+            onPressed: getLibraryData,
           ),
         ],
       ),
@@ -116,53 +176,42 @@ class _ElibraryAppState extends State<ElibraryApp> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Cabang:', style: TextStyle(fontSize: 14)),
-                                DropdownButton<String>(
-                                  isExpanded: true,
-                                  value: selectedBranch,
-                                  onChanged: (String? newValue) {
-                                    setState(() {
-                                      selectedBranch = newValue ?? 'All';
-                                    });
-                                  },
-                                  items: branches
-                                      .map<DropdownMenuItem<String>>((String value) {
-                                    return DropdownMenuItem<String>(
-                                      value: value,
-                                      child: Text(value, style: const TextStyle(fontSize: 14)),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
+                            child: DropdownButton<String>(
+                              value: selectedBranch,
+                              isExpanded: true,
+                              items: branches.map((branch) {
+                                return DropdownMenuItem(
+                                  value: branch,
+                                  child: Text(branch),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedBranch = value!;
+                                  applyFilter();
+                                });
+                              },
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 10),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Bulan:', style: TextStyle(fontSize: 14)),
-                                DropdownButton<String>(
-                                  isExpanded: true,
-                                  value: selectedMonth,
-                                  onChanged: (String? newValue) {
-                                    setState(() {
-                                      selectedMonth = newValue ?? 'All';
-                                    });
-                                  },
-                                  items: months
-                                      .map<DropdownMenuItem<String>>((String value) {
-                                    return DropdownMenuItem<String>(
-                                      value: value,
-                                      child: Text(value, style: const TextStyle(fontSize: 14)),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ),
+                            child: DropdownButton<String>(
+                              value: selectedMonth,
+                              isExpanded: true,
+                              items: months.map((month) {
+                                return DropdownMenuItem(
+                                  value: month,
+                                  child: Text(month),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedMonth = value!;
+                                  applyFilter(); // Panggil applyFilter untuk memperbarui data berdasarkan bulan yang dipilih
+                                });
+                              },
+                            )
+
                           ),
                         ],
                       ),
@@ -176,56 +225,80 @@ class _ElibraryAppState extends State<ElibraryApp> {
                     Expanded(
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
-                        child: Table(
-                          border: TableBorder.all(color: Colors.grey),
-                          columnWidths: const {
-                            0: FixedColumnWidth(40), // Kolom 'No', ukuran tetap
-                            1: FixedColumnWidth(100), // Kolom 'Nama', ukuran tetap
-                            2: FixedColumnWidth(100), // Kolom 'Akses Elibrary', ukuran tetap
-                            3: FixedColumnWidth(100), // Kolom 'Detail', ukuran tetap
-                          },
-                          children: [
-                            TableRow(
-                              decoration: BoxDecoration(color: Colors.grey),
-                              children: [
-                                tableCell('No', isHeader: true),
-                                tableCell('Nama', isHeader: true),
-                                tableCell('Request Download', isHeader: true),
-                                tableCell('Detail', isHeader: true),
-                              ],
-                            ),
-                            ..._getUniqueEmployees().asMap().entries.map((entry) {
-                              int index = entry.key + 1;
-                              Employee employee = entry.value;
-                              int accessCount = _getAccessCount(employee.nama);
-                              return TableRow(
+                        child: SingleChildScrollView(  // Menambahkan satu level SingleChildScrollView
+                          child: Table(
+                            border: TableBorder.all(color: Colors.grey),
+                            columnWidths: const {
+                              0: FixedColumnWidth(40),
+                              1: FixedColumnWidth(100),
+                              2: FixedColumnWidth(100),
+                              3: FixedColumnWidth(100),
+                            },
+                            children: [
+                              TableRow(
+                                decoration: BoxDecoration(color: Colors.grey),
                                 children: [
-                                  tableCell(index.toString()),
-                                  tableCell(employee.nama),
-                                  tableCell(accessCount.toString()),
-                                 tableCellWithIcon(
-                                    Icons.document_scanner_outlined,
-                                    () {
-                                      // Mengirim data employee ke halaman DetailPage
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => DetailPage(employee: employee),
-                                        ),
-                                      );
-                                    },
-                                  ),
+                                  tableCell('No', isHeader: true),
+                                  tableCell('Nama', isHeader: true),
+                                  tableCell('Tanggal Akses', isHeader: true),
+                                  tableCell('Detail', isHeader: true),
                                 ],
-                              );
-                            }).toList(),
-                          ],
+                              ),
+                              ...paginatedLibraryData.asMap().entries.map((entry) {
+                                int index = entry.key + 1;
+                                Employee employee = entry.value;
+                                return TableRow(
+                                  children: [
+                                    tableCell(index.toString()),
+                                    tableCell(employee.nama),
+                                    tableCell(_formatDate(employee.created_at)),
+                                    tableCellWithIcon(
+                                      Icons.document_scanner_outlined,
+                                      () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => DetailPage(employee: employee),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ],
+                          ),
                         ),
                       ),
+                    ),
+
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: goToPreviousPage,
+                          child: const Text('Back'),
+                        ),
+                        Text('Page $currentPage of $totalPages'),
+                        TextButton(
+                          onPressed: goToNextPage,
+                          child: const Text('Next'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
     );
   }
+String _formatDate(String createdAt) {
+  try {
+    DateTime date = DateTime.parse(createdAt);  // Parse string menjadi DateTime
+    return DateFormat('dd MMM yyyy').format(date);  // Format tanggal menjadi "dd MMM yyyy"
+  } catch (e) {
+    return 'Invalid Date';  // Jika gagal, tampilkan 'Invalid Date'
+  }
+}
 
   // Mengambil daftar unik berdasarkan nama
   List<Employee> _getUniqueEmployees() {
@@ -264,7 +337,9 @@ class _ElibraryAppState extends State<ElibraryApp> {
 class Employee {
   final String nama;
   final String jabatan;
+  final String profil;
   final String usia;
+  final String created_at;
   final String nip;
   final String namaBuku;
   final String kantorCabang;
@@ -272,7 +347,9 @@ class Employee {
   Employee({
     required this.nama,
     required this.jabatan,
+    required this.profil,
     required this.usia,
+    required this.created_at,
     required this.nip,
     required this.namaBuku,
     required this.kantorCabang,
@@ -280,12 +357,14 @@ class Employee {
 
   factory Employee.fromJson(Map<String, dynamic> json) {
   return Employee(
-    nama: json['nama'] ?? '',  // Pastikan ini adalah string
-    jabatan: json['jabatan'] ?? '',  // Pastikan ini adalah string
-    usia: json['usia'].toString(),  // Ubah usia menjadi string jika di API bertipe int
-    nip: json['nip'].toString(),  // Ubah nip menjadi string jika di API bertipe int
-    namaBuku: json['nama_buku'] ?? '',  // Pastikan ini adalah string
-    kantorCabang: json['kantor_cabang'] ?? '',  // Pastikan ini adalah string
+    nama: json['nama'] ?? '',  
+    jabatan: json['jabatan'] ?? '',  
+    profil: json['profil'] ?? '',
+    usia: json['usia'].toString(),  
+    created_at: json['created_at'].toString() ?? '',
+    nip: json['nip'].toString(),  
+    namaBuku: json['nama_buku'] ?? '',  
+    kantorCabang: json['kantor_cabang'] ?? '',  
   );
 }
 }
@@ -335,10 +414,22 @@ class DetailPage extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
-                  radius: 40,
-                  backgroundImage: AssetImage('assets/images/profile.jpeg'),
-                ),
+                Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent,
+                      borderRadius: BorderRadius.circular(40),
+                      image: DecorationImage(
+                        image: employee.profil.isNotEmpty
+                            ? (employee.profil.startsWith('http')
+                                ? NetworkImage(employee.profil) // URL gambar
+                                : AssetImage(employee.profil) as ImageProvider) // Path lokal
+                            : const AssetImage('assets/images/default.jpg'), // Gambar default
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,48 +447,40 @@ class DetailPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text('Cabang: ${employee.kantorCabang}'),
+                    Text('NIP: ${employee.nip}'),
                     const SizedBox(height: 4),
                     Text('Usia: ${employee.usia}'),
                     const SizedBox(height: 4),
-                    Text('NIP: ${employee.nip}'),
+                    Text('Kantor: ${employee.kantorCabang}'),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            // Buku yang dipinjam
-            const Text(
-              'Buku yang dipinjam',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 20),
             // Menampilkan buku yang dipinjam oleh karyawan
             Table(
-              border: TableBorder.all(color: Colors.grey),
-              columnWidths: const {
-                0: FractionColumnWidth(0.1),
-                1: FractionColumnWidth(0.7),
-                2: FractionColumnWidth(0.2),
-              },
+          border: TableBorder.all(color: Colors.grey),
+          columnWidths: const {
+            0: FractionColumnWidth(0.11), // Untuk kolom "No"
+            1: FractionColumnWidth(0.89), // Untuk kolom "Nama Buku"
+          },
+          children: [
+            TableRow(
+              decoration: BoxDecoration(color: Colors.blue[50]),
               children: [
-                TableRow(
-                  decoration: BoxDecoration(color: Colors.blue[50]),
-                  children: [
-                    tableCell('No', isHeader: true),
-                    tableCell('Nama Buku', isHeader: true),
-                    tableCell('Jumlah', isHeader: true),
-                  ],
-                ),
-                TableRow(
-                  children: [
-                    tableCell('1'),
-                    tableCell(employee.namaBuku), // Nama buku yang dipinjam
-                    tableCell('1'), // Anggap hanya 1 buku yang dipinjam
-                  ],
-                ),
+                tableCell('No', isHeader: true),
+                tableCell('Nama Buku', isHeader: true),
               ],
             ),
+            TableRow(
+              children: [
+                tableCell('1'),
+                tableCell(employee.namaBuku), // Nama buku yang dipinjam
+              ],
+            ),
+          ],
+        ),
+
           ],
         ),
       ),

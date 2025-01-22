@@ -1,6 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:kpi/cuti.dart';
 import 'package:kpi/halamanutama.dart';
 import 'package:kpi/pagelogin.dart';
@@ -17,6 +19,7 @@ import 'package:flutter/services.dart';
 
 Future <void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('id_ID', null);
    print("Initializing Firebase...");
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -76,14 +79,39 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'EHR KPI REPORT',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      debugShowCheckedModeBanner: false,
-      home: const LoginPage(), // Ensure this is pointing to the right page
-      builder: EasyLoading.init(),
-    );
-  }
+  print("Building EhrApp...");
+  return GetMaterialApp(
+    debugShowCheckedModeBanner: false,
+    title: 'EHR SYSTEM',
+    theme: ThemeData(
+      primarySwatch: Colors.blue,
+    ),
+    home: const LoginPage(),
+    builder: (context, child) {
+      print("Initializing EasyLoading...");
+      // Pastikan EasyLoading.init() diterapkan dengan benar
+      return EasyLoading.init()(context, child);
+    },
+    routes: {
+      '/cutireport': (context) => const EmployeeLeavePage(prevPage: 'home'),
+      // '/pendidikan': (context) => const PendidikanWidget(prevPage: 'home'),
+      // '/kalenderkerja': (context) =>
+      //     const KalendarReportPage(prevPage: 'home'),
+      // '/gaji': (context) => const PayRollWidget(prevPage: 'home'),
+      // '/perizinan': (context) => const TerPlgWidget(),
+      // '/lembur': (context) => const LemburWidget(prevPage: 'home'),
+      // '/cuti': (context) => const PerizinanWidget(prevPage: 'home'),
+      // '/elearning': (context) => const ElearningWidget(),
+      // '/elibrary': (context) => const Elibrary(prevPage: 'home'),
+      // '/kunjungan': (context) => const KunjunganWidget(prevPage: 'home'),
+      // '/todokpi': (context) => const TodoWidget(prevPage: 'home'),
+      // '/audit': (context) => const AuditWidget(prevPage: 'home'),
+      // '/auditrealisasi': (context) =>
+      //     const RealisasiAuditWidget(prevPage: 'home'),
+      // '/berita': (context) => const News(prevPage: 'home'),
+      // '/kpi': (context) => const DashboardKpiWidget(prevPage: 'home'),
+    },
+  );
+}
+
 }

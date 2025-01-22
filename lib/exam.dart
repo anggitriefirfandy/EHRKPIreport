@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:kpi/api/api.dart';
 
 class ExamApp extends StatefulWidget {
   const ExamApp({Key? key}) : super(key: key);
@@ -11,129 +14,123 @@ class ExamApp extends StatefulWidget {
 }
 
 class _ExamAppState extends State<ExamApp> {
-  final List<String> branches = [
-    'All',
-    'Kantor Pusat',
-    'Kantor Cabang 1',
-    'Kantor Cabang 2'
-  ];
+  late Future<List<Exam>> futureExam;
+  List<Exam> allExamData = [];
+  List<Exam> filteredExamData = [];
+  List<Exam> paginatedExamData = [];
+  int currentPage = 1;
+  final int itemsPerPage = 10; // Jumlah data per halaman
+  int totalPages = 1;
+  String selectedBranch = 'Semua Cabang'; // Default pilihan cabang
+  String selectedMonth = 'Semua Bulan'; // Default pilihan bulan
+  List<String> branches = ['Semua Cabang']; // Default cabang
+  
   final List<String> months = [
-    'All',
-    'January',
-    'February',
-    'March',
+    'Semua Bulan',
+    'Januari',
+    'Februari',
+    'Maret',
     'April',
-    'May',
-    'June',
-    'July',
-    'August',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
     'September',
-    'October',
+    'Oktober',
     'November',
-    'December'
+    'Desember'
   ];
 
-  String selectedBranch = 'All';
-  String selectedMonth = 'All';
-
-  List<Map<String, dynamic>> employees = []; // Awalnya kosong untuk data dari API
-
+  List<Exam> exams = []; // Awalnya kosong untuk data dari API
+  bool isLoading = true;
   @override
   void initState() {
     super.initState();
-    fetchExamReport(); // Memuat data saat widget diinisialisasi
+    futureExam = getExamData(); // Memuat data saat widget diinisialisasi
   }
 
-  Future<void> fetchExamReport() async {
-    const String url = 'https://your.domainnamegoeshere.xyz/api/ehrreport/examreport';
+  Future<List<Exam>> getExamData() async {
+    
     try {
-      var response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer 87718|Nya4lvosf7a5yt1VtZqZNey7PHOI9eoI2CU3LQUk5aade454', // Ganti dengan token yang valid
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        print("Response body: ${response.body}");
-
-        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
+      String month = months.indexOf(selectedMonth).toString();
+      String year = DateTime.now().year.toString();
+      var url = '/examreport?month=$month&year=$year';
+      print('Fetching data with filters - Month: $month, Year: $year'); 
+      var dat = await ApiHandler().getData(url);
+      if (dat.statusCode == 200 && dat.body != null) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+        if (jsonResponse.containsKey('data')&& jsonResponse['data'] is List) {
           final List<dynamic> data = jsonResponse['data'];
-          print("Data berhasil diambil: $data");
+          List<Exam> examDataList = data.map((item) => Exam.fromJson(item)).toList();
+          examDataList.sort((a, b) => a.nama.compareTo(b.nama));
 
-          // Mengelompokkan data berdasarkan nama
-          Map<String, List<Map<String, dynamic>>> groupedData = {};
-          for (var item in data) {
-            String name = item["nama"] ?? 'N/A';
-            if (groupedData.containsKey(name)) {
-              groupedData[name]!.add(item);
-            } else {
-              groupedData[name] = [item];
-            }
+          final branchSet = <String>{'Semua Cabang'};
+          for (var examData in examDataList) {
+            branchSet.add(examData.kantorCabang);
           }
-
-          // Mengubah data untuk menampilkan materi ter-increment dan rata-rata skor
           setState(() {
-            employees = groupedData.entries.map<Map<String, dynamic>>((entry) {
-              String name = entry.key;
-              List<Map<String, dynamic>> groupItems = entry.value;
-
-              // Menghitung rata-rata skor dan materi unik
-              double totalScore = groupItems.fold(0.0, (sum, item) {
-                var nilai = item["nilai"];
-                if (nilai is String) {
-                  return sum + (double.tryParse(nilai) ?? 0);
-                } else if (nilai is num) {
-                  return sum + nilai.toDouble();
-                }
-                return sum;
-              });
-              
-              double averageScore = totalScore / groupItems.length;
-              
-              Set<String> materiSet = {};
-              for (var item in groupItems) {
-                String materi = item["kategori"] ?? 'N/A';
-                materiSet.add(materi);
-              }
-              
-              String materiCount = ' ${materiSet.length}';
-
-              return {
-              "nama": name,
-              "jabatan": groupItems[0]["jabatan"] ?? 'N/A',
-              "kategori": materiCount,
-              "nilai": averageScore.toStringAsFixed(2),
-              "materi": groupItems,
-              "usia": groupItems[0]["usia"],  // Usia
-              "nip": groupItems[0]["nip"],    // NIP
-              "tanggal_pengisian": groupItems[0]["tanggal_pengisian"],  // Tanggal Pengisian
-              "kantor_cabang": groupItems[0]["kantor_cabang"],  // Kantor Cabang
-              };
-            }).toList();
+            branches = branchSet.toList();
+            allExamData = examDataList;
+            filteredExamData = examDataList;
+            totalPages = (filteredExamData.length / itemsPerPage).ceil();
+            updatePaginatedData();
+            isLoading = false;
+            exams = examDataList;
           });
-
-
-
-
+          return examDataList;
         } else {
-          print("Format data tidak valid: ${jsonResponse['data']}");
-          showErrorDialog('Format data tidak valid');
+          throw Exception('invalid data format');
         }
-      } else {
-        print("Gagal memuat data: ${response.statusCode}");
-        showErrorDialog('Gagal memuat data: ${response.statusCode}');
+      }else{
+        throw Exception('Failed to fetch exam data. status code ${dat.statusCode}');
       }
     } catch (e) {
-      print("Terjadi kesalahan: $e");
-      showErrorDialog('Terjadi kesalahan: $e');
+      Fluttertoast.showToast(msg: 'Eror: $e');
+     return [];
     }
   }
+  void applyFilter() {
+  setState(() {
+    filteredExamData = allExamData.where((exam) {
+      bool matchesBranch = selectedBranch == 'Semua Cabang' || exam.kantorCabang == selectedBranch;
+      bool matchesMonth = selectedMonth == 'Semua Bulan' || 
+          DateTime.parse(exam.tanggal_pengisian).month == months.indexOf(selectedMonth);
+      return matchesBranch && matchesMonth;
+    }).toList();
+    filteredExamData.sort((a, b) => a.nama.compareTo(b.nama)); // Urutkan berdasarkan nama
+    currentPage = 1;
+    totalPages = (filteredExamData.length / itemsPerPage).ceil();
+    updatePaginatedData();
+  });
+  print('Applied Filters: Branch - $selectedBranch, Month - $selectedMonth');
+  print('Filtered Data Count: ${filteredExamData.length}');
+}
 
+void updatePaginatedData() {
+  int startIndex = (currentPage - 1) * itemsPerPage;
+  int endIndex = startIndex + itemsPerPage;
 
+  setState(() {
+    paginatedExamData = filteredExamData.sublist(startIndex, endIndex.clamp(0, filteredExamData.length));
+  });
+}
 
+void goToNextPage() {
+    if (currentPage < totalPages) {
+      setState(() {
+        currentPage++;
+        updatePaginatedData();
+      });
+    }
+  }
+  void goToPreviousPage() {
+    if (currentPage > 1) {
+      setState(() {
+        currentPage--;
+        updatePaginatedData();
+      });
+    }
+  }
 
 
   void showErrorDialog(String message) {
@@ -166,57 +163,46 @@ class _ExamAppState extends State<ExamApp> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(10.0),
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Cabang:', style: TextStyle(fontSize: 14)),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedBranch,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedBranch = newValue ?? 'All';
-                          });
-                        },
-                        items: branches
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, style: const TextStyle(fontSize: 14)),
-                          );
-                        }).toList(),
-                      ),
-                    ],
+                  child: DropdownButton<String>(
+                    value: selectedBranch,
+                    isExpanded: true,
+                    items: branches.map((branch) {
+                      return DropdownMenuItem(
+                        value: branch,
+                        child: Text(branch),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedBranch = value!;
+                        applyFilter();
+                      });
+                    },
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Bulan:', style: TextStyle(fontSize: 14)),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedMonth,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedMonth = newValue ?? 'All';
-                          });
-                        },
-                        items: months
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, style: const TextStyle(fontSize: 14)),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
+                  child: DropdownButton<String>(
+                    value: selectedMonth,
+                    isExpanded: true,
+                    items: months.map((month) {
+                      return DropdownMenuItem(
+                        value: month,
+                        child: Text(month),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedMonth = value!;
+                        applyFilter(); // Panggil applyFilter untuk memperbarui data berdasarkan bulan yang dipilih
+                      });
+                    },
+                  )
+
                 ),
               ],
             ),
@@ -228,75 +214,101 @@ class _ExamAppState extends State<ExamApp> {
           ),
           const SizedBox(height: 16),
           Expanded(
-  child: employees.isEmpty
-      ? const Center(child: CircularProgressIndicator()) // Indikator loading
-      : SingleChildScrollView( // Membungkus dengan SingleChildScrollView untuk scroll vertikal
-          scrollDirection: Axis.vertical, // Tentukan arah scroll vertikal
-          child: SingleChildScrollView( // Scroll horizontal untuk mendukung tabel lebih lebar
-            scrollDirection: Axis.horizontal,
-            child: Table(
-              border: TableBorder.all(color: Colors.grey),
-              columnWidths: const {
-                0: FixedColumnWidth(40),
-                1: FixedColumnWidth(100),
-                2: FixedColumnWidth(100),
-                3: FixedColumnWidth(100),
-               
-              },
-              children: [
-                TableRow(
-                  decoration: BoxDecoration(color: Colors.grey),
-                  children: [
-                    tableCell('No', isHeader: true),
-                    tableCell('Nama', isHeader: true),
-                    tableCell('Jabatan', isHeader: true),
-                   
-                    tableCell('Skor', isHeader: true),
-                  ],
+              child: exams.isEmpty
+                  ? const Center(child: CircularProgressIndicator()) // Indikator loading
+                  : SingleChildScrollView( // Membungkus dengan SingleChildScrollView untuk scroll vertikal
+                      scrollDirection: Axis.vertical, // Tentukan arah scroll vertikal
+                      child: SingleChildScrollView( // Scroll horizontal untuk mendukung tabel lebih lebar
+                        scrollDirection: Axis.horizontal,
+                        child: Table(
+                          border: TableBorder.all(color: Colors.grey),
+                          columnWidths: const {
+                            0: FixedColumnWidth(40),
+                            1: FixedColumnWidth(100),
+                            2: FixedColumnWidth(100),
+                            3: FixedColumnWidth(100),
+                          
+                          },
+                          children: [
+                            TableRow(
+                              decoration: BoxDecoration(color: Colors.grey),
+                              children: [
+                                tableCell('No', isHeader: true),
+                                tableCell('Nama', isHeader: true),
+                                tableCell('Jabatan', isHeader: true),
+                              
+                                tableCell('Skor', isHeader: true),
+                              ],
+                            ),
+                            ...paginatedExamData.asMap().entries.map((entry) {
+                              int index = entry.key + 1;
+                              Exam exam = entry.value;
+                              return TableRow(
+                                children: [
+                                  tableCell(index.toString()),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => DetailPage(exam: exam),
+                                      ),
+                                    );
+
+                                    },
+                                    child: tableCell(exam.nama),
+                                  ),
+                                  tableCell(exam.jabatan),
+                                  tableCell(exam.nilai),
+                                ],
+                              );
+                            }).toList(),
+
+                    ],
+                  ),
                 ),
-                ...employees.asMap().entries.map((entry) {
-                  int index = entry.key + 1;
-                  Map<String, dynamic> employee = entry.value;
-                  return TableRow(
-  children: [
-    tableCell(index.toString()),
-    // Pastikan data yang dikirim ke DetailPage berisi materi yang valid
-// Bagian onTap di ExamApp (ketika nama diklik)
-GestureDetector(
-  onTap: () {
-    // Menavigasi ke halaman DetailPage dan mengirimkan nama pegawai
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => DetailPage(
-          employeeName: employee['nama'] ?? 'N/A', // Mengirim nama pegawai
-        ),
-      ),
-    );
-  },
-  child: tableCell(employee['nama'] ?? 'N/A'),
-),
-
-
-
-
-
-    tableCell(employee['jabatan'] ?? 'N/A'),
-    tableCell(employee['nilai'] ?? 'N/A'),
-  ],
-);
-
-                }).toList(),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: goToPreviousPage,
+                  child: const Text('Back'),
+                ),
+                Text('Page $currentPage of $totalPages'),
+                TextButton(
+                  onPressed: goToNextPage,
+                  child: const Text('Next'),
+                ),
               ],
             ),
-          ),
-        ),
-),
-
-
         ],
       ),
     );
+  }
+  String _formatDate(String createdAt) {
+  try {
+    DateTime date = DateTime.parse(createdAt);  // Parse string menjadi DateTime
+    return DateFormat('dd MMM yyyy').format(date);  // Format tanggal menjadi "dd MMM yyyy"
+  } catch (e) {
+    return 'Invalid Date';  // Jika gagal, tampilkan 'Invalid Date'
+  }
+}
+List<Exam> _getUniqueExam() {
+    final Set<String> seenNames = {};
+    final List<Exam> uniqueExams = [];
+
+    for (var exam in exams) {
+      if (!seenNames.contains(exam.nama)) {
+        seenNames.add(exam.nama);
+        uniqueExams.add(exam);
+      }
+    }
+    return uniqueExams;
+  }
+  int _getAccessCount(String name) {
+    return exams.where((exam) => exam.nama == name).length;
   }
 
   Widget tableCell(String text, {bool isHeader = false}) {
@@ -313,179 +325,163 @@ GestureDetector(
     );
   }
 }
+class Exam {
+  final String nama;
+  final String jabatan;
+  final String profil;
+  final String usia;
+  final String created_at;
+  final String nip;
+  final String kategori;
+  final String kantorCabang;
+  final String tanggal_pengisian;
+  final String nilai;
 
+  Exam({
+    required this.nama,
+    required this.jabatan,
+    required this.profil,
+    required this.usia,
+    required this.created_at,
+    required this.nip,
+    required this.kategori,
+    required this.kantorCabang,
+    required this.tanggal_pengisian,
+    required this.nilai
+
+  });
+  factory Exam.fromJson(Map<String, dynamic> json) {
+  return Exam(
+    nama: json['nama'] ?? '',  
+    jabatan: json['jabatan'] ?? '',  
+    profil: json['profil'] ?? '',
+    usia: json['usia'].toString(),  
+    created_at: json['created_at'].toString() ?? '',
+    nip: json['nip'].toString(),  
+    kategori: json['kategori'] ?? '',  
+    kantorCabang: json['kantor_cabang'] ?? '',
+    tanggal_pengisian: json['tanggal_pengisian'] ?? '',
+    nilai: json['nilai'] ?? '',  
+  );
+}
+}
 
 class DetailPage extends StatefulWidget {
-  final String employeeName; // Menambahkan parameter untuk menerima nama
+  final Exam exam;
 
-  const DetailPage({Key? key, required this.employeeName}) : super(key: key);
+  const DetailPage({Key? key, required this.exam}) : super(key: key);
 
   @override
   _DetailPageState createState() => _DetailPageState();
 }
 
 class _DetailPageState extends State<DetailPage> {
-  List<Map<String, dynamic>> employees = []; // Data pegawai yang akan ditampilkan
-  bool isLoading = true; // Indikator loading
+  List<Map<String, dynamic>> exam = []; // Data pegawai yang akan ditampilkan
+  bool isLoading = false; // Indikator loading
 
   @override
   void initState() {
     super.initState();
-    fetchEmployeeData(); // Memuat data pegawai berdasarkan nama yang diterima
+    // fetchEmployeeData(); // Memuat data pegawai berdasarkan nama yang diterima
   }
 
-  Future<void> fetchEmployeeData() async {
-    const String url = 'https://your.domainnamegoeshere.xyz/api/ehrreport/examreport';
-    try {
-      var response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer 87718|Nya4lvosf7a5yt1VtZqZNey7PHOI9eoI2CU3LQUk5aade454',
-          'Content-Type': 'application/json',
-        },
-      );
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
-          final List<dynamic> data = jsonResponse['data'];
-
-          // Mengonversi List<dynamic> menjadi List<Map<String, dynamic>>
-          List<Map<String, dynamic>> employeeData = data
-              .map<Map<String, dynamic>>((item) => item as Map<String, dynamic>)
-              .toList();
-
-          // Menyaring data berdasarkan nama yang diterima
-          List<Map<String, dynamic>> filteredEmployeeData = employeeData
-              .where((item) => item['nama'] == widget.employeeName) // Hanya menampilkan data yang sesuai
-              .toList();
-
-          setState(() {
-            employees = filteredEmployeeData; // Menyimpan data yang sudah disaring
-            isLoading = false; // Menandakan bahwa data sudah dimuat
-          });
-        } else {
-          print("Format data tidak valid");
-        }
-      } else {
-        print("Gagal memuat data: ${response.statusCode}");
-      }
-    } catch (e) {
-      print("Terjadi kesalahan: $e");
-    }
-  }
-
-  @override
+@override
 Widget build(BuildContext context) {
+  final exam = widget.exam;
   return Scaffold(
     appBar: AppBar(
-      title: const Text('Detail'),
+      title: const Text('Detail',
+      style: TextStyle(color: Colors.white),),
       backgroundColor: const Color(0xFF007BFF),
       centerTitle: true,
+      iconTheme: const IconThemeData(color: Colors.white),
     ),
     body: isLoading
         ? const Center(child: CircularProgressIndicator()) // Loading indicator
         : SingleChildScrollView(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Employee profile details
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        employees.isNotEmpty
-                            ? employees[0]['nama'] ?? 'N/A'
-                            : 'N/A',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        employees.isNotEmpty
-                            ? employees[0]['jabatan'] ?? 'N/A'
-                            : 'N/A',
-                        style: const TextStyle(
-                            fontSize: 14, color: Color(0xFF007BFF)),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'NIP: ${employees.isNotEmpty ? employees[0]['nip'] ?? 'N/A' : 'N/A'}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      Text(
-                        'Usia: ${employees.isNotEmpty ? employees[0]['usia'] ?? 'N/A' : 'N/A'} Tahun',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      Text(
-                        'Kantor: ${employees.isNotEmpty ? employees[0]['kantor_cabang'] ?? 'N/A' : 'N/A'}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Text(
-                            'INDEX RATA-RATA KPI 4.0',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF007BFF),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Row(
-                            children: const [
-                              Icon(Icons.star, color: Colors.amber, size: 15),
-                              Icon(Icons.star, color: Colors.amber, size: 15),
-                              Icon(Icons.star, color: Colors.amber, size: 15),
-                              Icon(Icons.star, color: Colors.amber, size: 15),
-                              Icon(Icons.star_border, color: Colors.amber, size: 15),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Table for displaying exam details
-                Table(
-                  border: TableBorder.all(color: Colors.grey),
-                  columnWidths: const {
-                    0: FixedColumnWidth(50), // Ubah lebar kolom No
-                    1: FixedColumnWidth(110), // Ubah lebar kolom Tanggal
-                    2: FixedColumnWidth(145), // Ubah lebar kolom Materi
-                    3: FixedColumnWidth(60), // Ubah lebar kolom Skor
-                  },
+                Padding(padding: EdgeInsets.all(16.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TableRow(
-                      decoration: BoxDecoration(color: Colors.blue[50]),
-                      children: [
-                        tableCell('No', isHeader: true),
-                        tableCell('Tanggal', isHeader: true),
-                        tableCell('Materi', isHeader: true),
-                        tableCell('Skor', isHeader: true),
-                      ],
+                    Container(
+                      width: 75,
+                      height: 75  ,
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(30),
+                        image: DecorationImage(
+                          image: exam.profil.isNotEmpty
+                              ? (exam.profil.startsWith('http')
+                                  ? NetworkImage(exam.profil) // URL gambar
+                                  : AssetImage(exam.profil) as ImageProvider) // Path lokal
+                              : const AssetImage('assets/images/default.jpg'), // Gambar default
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
-                    // Displaying filtered data based on the selected employee
-                    ...employees.asMap().entries.map((entry) {
-                      int index = entry.key + 1;
-                      Map<String, dynamic> employee = entry.value;
-                      return TableRow(
-                        children: [
-                          tableCell(index.toString()), // No
-                          tableCell(employee['tanggal_pengisian'] ?? 'N/A'), // Tanggal
-                          tableCell(employee['kategori'] ?? 'N/A'), // Materi
-                          tableCell(employee['nilai'] ?? 'N/A'), // Skor
-                        ],
-                      );
-                    }).toList(),
+
+                    const SizedBox(width: 16,),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                  exam.nama,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  exam.jabatan,
+                  style: const TextStyle(
+                      fontSize: 14, color: Color(0xFF007BFF)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'NIP: ${exam.nip}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Usia: ${exam.usia} Tahun',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Kantor: ${exam.kantorCabang}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Kategori: ${exam.kategori}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Nilai: ${exam.nilai}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Tanggal Pengisian: ${DateFormat('dd MMM yyyy').format(DateTime.parse(exam.tanggal_pengisian))}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                      ],
+                    ))
                   ],
                 ),
+                ),
+                
+                
               ],
             ),
           ),
+        ],
+      ),
+    ),
+    
   );
 }
 

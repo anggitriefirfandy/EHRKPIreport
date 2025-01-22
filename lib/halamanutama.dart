@@ -154,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 10),
                     buildMenuItem('assets/images/kpi.png', 'KPI', KPIPage(), context),
                     buildMenuItem('assets/images/absensi.png', 'Absensi', Absen(), context),
-                    buildMenuItem('assets/images/cuti.png', 'Cuti', EmployeeLeavePage(), context),
+                    buildMenuItem('assets/images/cuti.png', 'Cuti', EmployeeLeavePage(prevPage: '',), context),
                     buildMenuItem('assets/images/exam.png', 'Exam', ExamApp(), context), // New menu item,
                     buildMenuItem('assets/images/library.png', 'Elibrary', ElibraryApp(), context),
                     buildMenuItem('assets/images/lembur.png', 'Lembur', Lembur1(), context),
