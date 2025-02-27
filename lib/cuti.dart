@@ -1,170 +1,244 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:kpi/api/api.dart';
+import 'package:http/http.dart' as http;
+import 'package:kpi/widget/tablecuti.dart';
+import 'package:kpi/widget/widgetcuti.dart';
 
 class EmployeeLeavePage extends StatefulWidget {
-  const EmployeeLeavePage({Key? key}) : super(key: key);
+  const EmployeeLeavePage({required this.prevPage, super.key});
+  final String prevPage;
 
   @override
   _EmployeeLeavePageState createState() => _EmployeeLeavePageState();
 }
 
 class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
-  final List<Employee> employees = const [
-    Employee('Mawar Eva de Jongh', 'Front end Development', '09887676565657897', 'Kantor Pusat', 4.0, 'assets/images/mawareva.jpg'),
-    Employee('Bryan Domani', 'Back end Development', '09887676565657897', 'Kantor Pusat', 4.0, 'assets/images/bryan.jpg'),
-    Employee('Iqbal Ramadhan', 'Back end Development', '09887676565657897', 'Kantor Pusat', 4.0, 'assets/images/iqbal2.jpg'),
-    Employee('Syifa Hadju', 'UI & UX', '09887676565657897', 'Kantor Pusat', 4.0, 'assets/images/bella.jpg'),
-    Employee('Kylie Jenner', 'UI & UX', '09887676565657897', 'Kantor Pusat', 4.0, 'assets/images/gigi.jpg'),
-    Employee('Gigi Hadid', 'Front end Development', '09887676565657897', 'Kantor Pusat', 5.0, 'assets/images/hadid.jpg'),
-    Employee('Kendal Jenner', 'Front end Development', '09887676565657897', 'Kantor Pusat', 5.0, 'assets/images/aisyah.jpg'),
-    Employee('Zayn Malik', 'Back end Development', '09887676565657897', 'Kantor Pusat', 5.0, 'assets/images/vino.jpg'),
-    // More employees with their respective images
-  ];
+  late Future<List<LeaveData>> futureLeaveData;
+  List<LeaveData> allLeaveData = [];
+  List<LeaveData> filteredLeaveData = [];
+  List<LeaveData> paginatedLeaveData = [];
+  int currentPage = 1;
+  final int itemsPerPage = 10; // Jumlah data per halaman
+  int totalPages = 1;
 
-  List<Employee> filteredEmployees = [];
-  String searchQuery = '';
-  String selectedBranch = 'All'; // Default to 'All'
-  String selectedMonth = 'All';  // Default to 'All'
+  String selectedBranch = 'Semua Cabang'; // Default pilihan cabang
+  String selectedMonth = 'Semua Bulan'; // Default pilihan bulan
+  List<String> branches = ['Semua Cabang']; // Default cabang
+  final List<String> months = [
+    'Semua Bulan',
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember'
+  ];
 
   @override
   void initState() {
     super.initState();
-    filteredEmployees = employees;
+    futureLeaveData = getDataCuti();
+  } 
+  Future<List<LeaveData>> getDataCuti() async {
+  try {
+    String month = months.indexOf(selectedMonth).toString();
+    String year = DateTime.now().year.toString();
+    var url = '/cutireport';
+    
+    var dat = await ApiHandler().getData(url);
+
+    if (dat.statusCode == 200 && dat.body != null) {
+      final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+       debugPrint('API Response cuti Status Code: ${dat.statusCode}');
+      debugPrint('API Response cuti Body: ${dat.body}');
+
+      if (jsonResponse.containsKey('data') && jsonResponse['data'] is Map) {
+        final Map<String, dynamic> dataMap = jsonResponse['data'];
+
+        List<LeaveData> leaveDataList = dataMap.values.map((item) => LeaveData.fromJson(item)).toList();
+
+        final branchSet = <String>{'Semua Cabang'};
+        for (var leaveData in leaveDataList) {
+          branchSet.add(leaveData.kantorCabang);
+        }
+
+        setState(() {
+          branches = branchSet.toList();
+          allLeaveData = leaveDataList;
+          filteredLeaveData = leaveDataList;
+          totalPages = (filteredLeaveData.length / itemsPerPage).ceil();
+          updatePaginatedData();
+        });
+
+        return leaveDataList;
+      } else {
+        throw Exception('Invalid data format');
+      }
+    } else {
+      throw Exception('Failed to fetch leave data. Status code: ${dat.statusCode}');
+    }
+  } catch (e) {
+    Fluttertoast.showToast(msg: 'Error: $e');
+    return [];
+  }
+}
+
+
+
+
+  void applyFilter() {
+    setState(() {
+      filteredLeaveData = allLeaveData.where((leave) {
+        bool matchesBranch = selectedBranch == 'Semua Cabang' || leave.kantorCabang == selectedBranch;
+        return matchesBranch;
+      }).toList();
+      currentPage = 1; // Reset ke halaman pertama setelah filter diubah
+      totalPages = (filteredLeaveData.length / itemsPerPage).ceil();
+      updatePaginatedData();
+    });
+    print('Applied Filters: Branch - $selectedBranch, Month - $selectedMonth');
+  print('Filtered Data Count: ${filteredLeaveData.length}');
   }
 
-  void filterEmployees() {
+  void updatePaginatedData() {
+    int startIndex = (currentPage - 1) * itemsPerPage;
+    int endIndex = startIndex + itemsPerPage;
+
     setState(() {
-      filteredEmployees = employees.where((employee) {
-        final matchesName = employee.name.toLowerCase().contains(searchQuery.toLowerCase());
-        final matchesBranch = selectedBranch == 'All' || employee.office == selectedBranch;
-        // For simplicity, you could apply month filtering here based on other data
-        return matchesName && matchesBranch;
-      }).toList();
+      paginatedLeaveData =
+          filteredLeaveData.sublist(startIndex, endIndex.clamp(0, filteredLeaveData.length));
     });
+  }
+
+  void goToNextPage() {
+    if (currentPage < totalPages) {
+      setState(() {
+        currentPage++;
+        updatePaginatedData();
+      });
+    }
+  }
+
+  void goToPreviousPage() {
+    if (currentPage > 1) {
+      setState(() {
+        currentPage--;
+        updatePaginatedData();
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-  title: const Text(
-    'Cuti Pegawai',
-    style: TextStyle(
-      color: Colors.white,
-      fontSize: 20, // Set font size to 20
-    ),
-  ),
-  centerTitle: true,
-  backgroundColor: const Color(0xFF007BFF), // Add const for consistency
-  iconTheme: const IconThemeData(
-    color: Colors.white,
-  ),
-  actions: [
-    Theme(
-      data: Theme.of(context).copyWith(
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Cuti Pegawai',
+          style: TextStyle(color: Colors.white),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF007BFF),
       ),
-      child: IconButton(
-        icon: const Icon(Icons.search),
-        onPressed: () {
-          showSearch(
-            context: context,
-            delegate: EmployeeSearchDelegate(employees),
-          );
-        },
-      ),
-    ),
-  ],
-),
-
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(10.0),
             child: Row(
               children: [
-                // Dropdown untuk Cabang
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Cabang:'),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedBranch, // Set default value to 'All'
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedBranch = newValue ?? 'All'; // Ensure it's never null
-                            filterEmployees();
-                          });
-                        },
-                        items: ['All', 'Kantor Pusat', 'Kantor Cabang 1', 'Kantor Cabang 2']
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                      ),
-                    ],
+                  child: DropdownButton<String>(
+                    value: selectedBranch,
+                    isExpanded: true,
+                    items: branches.map((branch) {
+                      return DropdownMenuItem(
+                        value: branch,
+                        child: Text(branch),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedBranch = value!;
+                        applyFilter();
+                      });
+                    },
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Dropdown untuk Bulan
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Bulan:'),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedMonth, // Set default value to 'All'
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedMonth = newValue ?? 'All'; // Ensure it's never null
-                            filterEmployees();
-                          });
-                        },
-                        items: [
-                          'All',
-                          'January',
-                          'February',
-                          'March',
-                          'April',
-                          'May',
-                          'June',
-                          'July',
-                          'August',
-                          'September',
-                          'October',
-                          'November',
-                          'December'
-                        ].map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
+                const SizedBox(width: 10),
+                // Expanded(
+                //   child: DropdownButton<String>(
+                //     value: selectedMonth,
+                //     isExpanded: true,
+                //     items: months.map((month) {
+                //       return DropdownMenuItem(
+                //         value: month,
+                //         child: Text(month),
+                //       );
+                //     }).toList(),
+                //     onChanged: (value) {
+                //       setState(() {
+                //         selectedMonth = value!;
+                //         applyFilter(); // Panggil applyFilter untuk memperbarui data berdasarkan bulan yang dipilih
+                //       });
+                //     },
+                //   )
+
+                // ),
               ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Pegawai',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-          ),
           Expanded(
-            child: ListView.builder(
-              itemCount: filteredEmployees.length,
-              itemBuilder: (context, index) {
-                return EmployeeCard(employee: filteredEmployees[index]); // Removed index parameter
+            child: FutureBuilder<List<LeaveData>>(
+              future: futureLeaveData,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                } else {
+                  return paginatedLeaveData.isEmpty
+                      ? const Center(child: Text('No data found.'))
+                      : ListView.builder(
+                          itemCount: paginatedLeaveData.length,
+                          itemBuilder: (context, index) {
+                            final employee = paginatedLeaveData[index];
+                            return EmployeeCard(employee: employee);
+                          },
+                        );
+                }
               },
             ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: goToPreviousPage,
+                child: const Text('Back'),
+              ),
+              Text('Page $currentPage of $totalPages'),
+              TextButton(
+                onPressed: goToNextPage,
+                child: const Text('Next'),
+              ),
+            ],
           ),
         ],
       ),
@@ -172,124 +246,110 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
   }
 }
 
-class EmployeeSearchDelegate extends SearchDelegate<Employee?> {
-  final List<Employee> employees;
 
-  EmployeeSearchDelegate(this.employees);
 
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
+class LeaveData {
+  final String pegawaiId;
+  final String nama;
+  final String profil;
+  final String nip;
+  // final String tanggal_pengisian;
+  final String jenisCuti;
+  // final int kategoriCuti;
+  // final String tglMulai;
+  // final String tglSelesai;
+  // final int jumlahAmbil;
+  // final int sisaCuti;
+  // final int statusCuti;
+  final String kantorCabang;
+  final String jabatan;
+  final String keterangan;
+  // final int total;
+  final int usia;
 
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, null);
-      },
+  LeaveData({
+    required this.pegawaiId,
+    required this.nama,
+    required this.profil,
+    required this.nip,
+    // required this.tanggal_pengisian,
+    required this.jenisCuti,
+    // required this.kategoriCuti,
+    // required this.tglMulai,
+    // required this.tglSelesai,
+    // required this.jumlahAmbil,
+    // required this.sisaCuti,
+    // required this.statusCuti,
+    required this.kantorCabang,
+    required this.jabatan,
+    required this.keterangan,
+    // required this.total,
+    required this.usia
+  });
+
+  factory LeaveData.fromJson(Map<String, dynamic> json) {
+    return LeaveData(
+      pegawaiId: json['pegawai_id'] ?? 'unknown',
+      nama:json['nama'] ?? 'unknown',
+      profil: json['profil'] ?? '',
+      nip: json['nip'] ?? '',
+      // tanggal_pengisian: json['tanggal_pengisian'],
+      jenisCuti: json['jenis_cuti'] ?? '',
+      // kategoriCuti: json['kategori_cuti'],
+      // tglMulai: json['tgl_mulai'],
+      // tglSelesai: json['tgl_selesai'],
+      // jumlahAmbil: json['jumlah_ambil'] ?? '',
+      // sisaCuti: json['sisa_cuti'] ?? '',
+      // statusCuti: json['status_cuti'] ?? '',
+      kantorCabang: json['kantor_cabang'] ?? '',
+      jabatan: json['jabatan'] ?? '',
+      keterangan: json['keterangan'] ?? "",
+      // total: json['total'] ?? '',
+      usia: json['usia'] ?? 0
     );
   }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    final results = employees.where((employee) => employee.name.toLowerCase().contains(query.toLowerCase())).toList();
-
-    return ListView.builder(
-      itemCount: results.length,
-      itemBuilder: (context, index) {
-        return ListTile(
-          title: Text(results[index].name),
-          subtitle: Text(results[index].position),
-          onTap: () {
-            close(context, results[index]);
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    final suggestions = employees.where((employee) => employee.name.toLowerCase().contains(query.toLowerCase())).toList();
-
-    return ListView.builder(
-      itemCount: suggestions.length,
-      itemBuilder: (context, index) {
-        return ListTile(
-          title: Text(suggestions[index].name),
-          subtitle: Text(suggestions[index].position),
-          onTap: () {
-            query = suggestions[index].name;
-            showResults(context);
-          },
-        );
-      },
-    );
-  }
-}
-
-class Employee {
-  final String name;
-  final String position;
-  final String nip; // NIP will always be a String, no need for null checks
-  final String office;
-  final double kpi;
-  final String imagePath; // Add a field for the image path
-
-  const Employee(this.name, this.position, this.nip, this.office, this.kpi, this.imagePath);
 }
 
 class EmployeeCard extends StatelessWidget {
-  final Employee employee;
+  final LeaveData employee;
 
   const EmployeeCard({Key? key, required this.employee}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        // Check if the clicked employee is 'Mawar Eva de Jongh' and navigate
-        if (employee.name == 'Mawar Eva de Jongh') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CutiScreen(), // Navigate to CutiScreen
-            ),
-          );
-        }
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Card(
-          elevation: 3,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  // Navigasi ke halaman detail cuti
+                  Get.to(() => CutiDetailPage(leaveData: employee, pegawaiId: employee.pegawaiId));
+                },
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Pure square image container without radius
                     Container(
-                      width: 60, // Set width for the square
-                      height: 60, // Set height for the square
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(30),
                         image: DecorationImage(
-                          image: AssetImage(employee.imagePath), // Load employee's image
-                          fit: BoxFit.cover, // Ensure the image covers the container
+                          image: employee.profil.isNotEmpty
+                              ? (employee.profil.startsWith('http')
+                                  ? NetworkImage(employee.profil) // URL gambar
+                                  : AssetImage(employee.profil) as ImageProvider) // Path lokal
+                              : const AssetImage('assets/images/default.jpg'), // Gambar default
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
@@ -299,61 +359,39 @@ class EmployeeCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            employee.name,
+                            employee.nama,
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 14, // Set font size to 14
+                              fontSize: 14,
+                              color: Colors.black
                             ),
                           ),
-                          const SizedBox(height: 5),
                           Text(
-                            employee.position,
+                            employee.jabatan,
                             style: const TextStyle(
-                              fontSize: 14, // Set font size to 14
-                              color: Color(0xFF007BFF),
                               fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.blue
                             ),
                           ),
                           const SizedBox(height: 5),
                           Text(
                             'NIP: ${employee.nip}',
-                            style: const TextStyle(fontSize: 14), // Set font size to 14
+                            style: const TextStyle(fontSize: 14),
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            'Kantor: ${employee.office}',
-                            style: const TextStyle(fontSize: 14), // Set font size to 14
+                            'Kantor: ${employee.kantorCabang}',
+                            style: const TextStyle(fontSize: 14),
                           ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Text(
-                                'INDEX RATA-RATA KPI ${employee.kpi}',
-                                style: const TextStyle(
-                                  color: Color(0xFF007BFF),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14, // Set font size to 14
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Row(
-                                children: List.generate(5, (starIndex) {
-                                  return Icon(
-                                    starIndex < employee.kpi ? Icons.star : Icons.star_border,
-                                    color: Colors.amber,
-                                    size: 14,
-                                  );
-                                }),
-                              ),
-                            ],
-                          ),
+                          const SizedBox(height: 5),
                         ],
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -361,203 +399,151 @@ class EmployeeCard extends StatelessWidget {
   }
 }
 
-// Dummy CutiScreen class, replace this with your actual screen
-class CutiScreen extends StatelessWidget {
-  final Map<String, dynamic> employee = {
-    'name': 'Mawar Eva de Jongh',
-    'position': 'Front end Development',
-    'nip': '0988767656s657897',
-    'age': 25,
-    'office': 'Kantor Pusat',
-    'leaves': [
-      {
-        'start_date': '2023-10-01',
-        'end_date': '2023-10-05',
-        'type': 'Cuti Tahunan',
-        'description': 'Liburan keluarga',
-      },
-      {
-        'start_date': '2023-11-10',
-        'end_date': '2023-11-12',
-        'type': 'Cuti Sakit',
-        'description': 'Demam',
-      },
-    ],
-  };
 
-   @override
+
+
+
+
+class CutiDetailPage extends StatefulWidget {
+  final LeaveData leaveData;
+  final String pegawaiId;
+
+  const CutiDetailPage({required this.leaveData,required this.pegawaiId, Key? key}) : super(key: key);
+
+  @override
+  State<CutiDetailPage> createState() => _CutiDetailPageState();
+}
+
+class _CutiDetailPageState extends State<CutiDetailPage> {
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Cuti',
-          style: TextStyle(fontSize: 20),
-        ),
+        title: const Text('Detail Cuti', style: TextStyle(color: Colors.white),),
         backgroundColor: const Color(0xFF007BFF),
-        foregroundColor: Colors.white,
-        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Profile section
-            _buildProfileSection(),
-            const SizedBox(height: 16),
-
-            // Container for tracking items (Cuti, Cuti diambil, Sisa cuti)
-            _buildTrackingContainer(),
-            const SizedBox(height: 16),
-
-            // Table for leave details
-            _buildLeaveTable(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileSection() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const CircleAvatar(
-          radius: 40,
-          backgroundImage: AssetImage('assets/images/profile.jpeg'),
-        ),
-        const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              employee['name'] ?? 'N/A',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                // Profil Gambar
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent,
+                    borderRadius: BorderRadius.circular(40),
+                    image: DecorationImage(
+                      image: widget.leaveData.profil.isNotEmpty
+                          ? (widget.leaveData.profil.startsWith('http')
+                              ? NetworkImage(widget.leaveData.profil) // URL gambar
+                              : AssetImage(widget.leaveData.profil) as ImageProvider) // Path lokal
+                          : const AssetImage('assets/images/default.jpg'), // Gambar default
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10), // Memberikan jarak antara gambar dan teks
+                // Teks Profil
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${widget.leaveData.nama}',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text('${widget.leaveData.jabatan}', style: const TextStyle(fontSize: 16)),
+                    Text('NIP: ${widget.leaveData.nip}', style: const TextStyle(fontSize: 16)),
+                    Text('Usia: ${widget.leaveData.usia}', style: const TextStyle(fontSize: 16)),
+                    Text('Kantor: ${widget.leaveData.kantorCabang}', style: const TextStyle(fontSize: 16)),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              employee['position'] ?? 'N/A',
-              style: const TextStyle(fontSize: 14, color: Color(0xFF007BFF)),
-            ),
-            const SizedBox(height: 4),
-            Text('NIP: ${employee['nip'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-            Text('Usia : ${employee['age'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-            Text('Kantor : ${employee['office'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-            const SizedBox(height: 4),
-            _buildKpiRow(),
+
+            
+            const SizedBox(height: 20),
+            // Text('Jenis Cuti: ${leaveData.jenisCuti}', style: const TextStyle(fontSize: 16)),
+            // Text(
+            //   'Tanggal Mulai: ${DateFormat('d MMMM yyyy', 'id_ID').format(DateTime.parse(leaveData.tglMulai))}',
+            //   style: const TextStyle(fontSize: 16),
+            // ),
+            // Text(
+            //   'Tanggal Selesai: ${DateFormat('d MMMM yyyy', 'id_ID').format(DateTime.parse(leaveData.tglSelesai))}',
+            //   style: const TextStyle(fontSize: 16),
+            // ),
+            // const SizedBox(height: 10),
+            // Text('Keterangan: ${leaveData.keterangan}', style: const TextStyle(fontSize: 16)),
+            // // Anda bisa menambahkan informasi lebih lanjut di sini
+            Widgetcuti(pegawaiId: widget.pegawaiId),
+          //   Padding(padding: const EdgeInsets.all(10.0),
+          //   child: Container(
+          //     padding: const EdgeInsets.all(16.0),
+          //     decoration: BoxDecoration(
+          //       color: const Color(0xFF007BFF), 
+                
+          //       borderRadius: BorderRadius.circular(8.0), 
+          //     ),
+          //     child: Row(
+          //       mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+          //       children: [
+          //         Column(
+          //           children: [
+          //         //     Text(
+          //         //       '${leaveData.total.toString()}h',
+          //         //   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          //         // ),
+          //         const SizedBox(height: 4),
+          //           const Text(
+          //             'Total Cuti',
+          //             style: TextStyle(fontSize: 12, color: Colors.white),
+          //           ),
+          //         ],
+          //       ),
+          //       Column(
+          //         children: [
+          //           // Text(
+          //           //   '${leaveData.jumlahAmbil.toString()}h',
+          //           //   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          //           // ),
+          //           const SizedBox(height: 4),
+          //           const Text(
+          //             'Cuti Diambil',
+          //             style: TextStyle(fontSize: 12, color: Colors.white),
+          //           ),
+          //         ],
+          //       ),
+          //       Column(
+          //         children: [
+          //           // Text(
+          //           //   '${leaveData.sisaCuti.toString()}h',
+          //           //   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          //           // ),
+          //           const SizedBox(height: 4),
+          //           const Text(
+          //             'Sisa Cuti',
+          //             style: TextStyle(fontSize: 12, color: Colors.white),
+          //           ),
+          //         ],
+          //       ),
+          //     ],
+          //   ),
+          // )
+          //   ),
+          Tablecuti(pegawaiId: widget.pegawaiId),
+              
+
+
           ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKpiRow() {
-    return Row(
-      children: [
-        const Text(
-          'INDEX RATA-RATA KPI 4.0',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF007BFF),
-          ),
-        ),
-        const SizedBox(width: 8),
-        const Row(
-          children: [
-            Icon(Icons.star, color: Colors.amber, size: 15),
-            Icon(Icons.star, color: Colors.amber, size: 15),
-            Icon(Icons.star, color: Colors.amber, size: 15),
-            Icon(Icons.star, color: Colors.amber, size: 15),
-            Icon(Icons.star_border, color: Colors.amber, size: 15),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTrackingContainer() {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
-        borderRadius: BorderRadius.circular(8),
-        color: const Color(0xFF007BFF),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          buildTrackingItem('25h', 'Cuti'),
-          buildTrackingItem('2h', 'Cuti diambil'),
-          buildTrackingItem('23h', 'Sisa cuti'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLeaveTable() {
-    return Table(
-      border: TableBorder.all(color: Colors.grey),
-      columnWidths: const {
-        0: FractionColumnWidth(0.3),
-        1: FractionColumnWidth(0.3),
-        2: FractionColumnWidth(0.2),
-        3: FractionColumnWidth(0.2),
-      },
-      children: [
-        TableRow(
-          decoration: BoxDecoration(color: Colors.blue[50]),
-          children: [
-            tableCell('Cuti Mulai', isHeader: true),
-            tableCell('Cuti Selesai', isHeader: true),
-            tableCell('Jenis Cuti', isHeader: true),
-            tableCell('Ket Cuti', isHeader: true),
-          ],
-        ),
-        ...employee['leaves'].map<TableRow>((leave) {
-          return TableRow(
-            children: [
-              tableCell(leave['start_date']),
-              tableCell(leave['end_date']),
-              tableCell(leave['type']),
-              tableCell(leave['description']),
-            ],
-          );
-        }).toList(),
-      ],
-    );
-  }
-
-  Widget buildTrackingItem(String value, String label) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget tableCell(String text, {bool isHeader = false}) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
         ),
       ),
     );

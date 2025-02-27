@@ -1,4 +1,10 @@
+import 'dart:convert';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:http/http.dart' as http;
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:kpi/api/api.dart';
 
 class ExamApp extends StatefulWidget {
   const ExamApp({Key? key}) : super(key: key);
@@ -8,61 +14,143 @@ class ExamApp extends StatefulWidget {
 }
 
 class _ExamAppState extends State<ExamApp> {
-  final List<String> branches = [
-    'All',
-    'Kantor Pusat',
-    'Kantor Cabang 1',
-    'Kantor Cabang 2'
-  ];
+  late Future<List<Exam>> futureExam;
+  List<Exam> allExamData = [];
+  List<Exam> filteredExamData = [];
+  List<Exam> paginatedExamData = [];
+  int currentPage = 1;
+  final int itemsPerPage = 10; // Jumlah data per halaman
+  int totalPages = 1;
+  String selectedBranch = 'Semua Cabang'; // Default pilihan cabang
+  String selectedMonth = 'Semua Bulan'; // Default pilihan bulan
+  List<String> branches = ['Semua Cabang']; // Default cabang
+  
   final List<String> months = [
-    'All',
-    'January',
-    'February',
-    'March',
+    'Semua Bulan',
+    'Januari',
+    'Februari',
+    'Maret',
     'April',
-    'May',
-    'June',
-    'July',
-    'August',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
     'September',
-    'October',
+    'Oktober',
     'November',
-    'December'
+    'Desember'
   ];
 
-  String selectedBranch = 'All';
-  String selectedMonth = 'All';
+  List<Exam> exams = []; // Awalnya kosong untuk data dari API
+  bool isLoading = true;
+  @override
+  void initState() {
+    super.initState();
+    futureExam = getExamData(); // Memuat data saat widget diinisialisasi
+  }
 
-  // Updated employees list with numeric material values
-  final List<Map<String, dynamic>> employees = [
-    {
-      "name": "Mawar Eva de Jongh",
-      "position": "Front end Developer",
-      "score": "85",
-      "material": "1",
-    },
-    {
-      "name": "Bryan Domani",
-      "position": "Backend Developer",
-      "score": "90",
-      "material": "2",
-    },
-    {
-      "name": "Iqbal Ramadhan",
-      "position": "Data Scientist",
-      "score": "78",
-      "material": "3",
-    },
-  ];
+  Future<List<Exam>> getExamData() async {
+    
+    try {
+      String month = months.indexOf(selectedMonth).toString();
+      String year = DateTime.now().year.toString();
+      var url = '/examreport?month=$month&year=$year';
+      print('Fetching data with filters - Month: $month, Year: $year'); 
+      var dat = await ApiHandler().getData(url);
+      if (dat.statusCode == 200 && dat.body != null) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+        if (jsonResponse.containsKey('data')&& jsonResponse['data'] is List) {
+          final List<dynamic> data = jsonResponse['data'];
+          List<Exam> examDataList = data.map((item) => Exam.fromJson(item)).toList();
+          examDataList.sort((a, b) => a.nama.compareTo(b.nama));
+
+          final branchSet = <String>{'Semua Cabang'};
+          for (var examData in examDataList) {
+            branchSet.add(examData.kantorCabang);
+          }
+          setState(() {
+            branches = branchSet.toList();
+            allExamData = examDataList;
+            filteredExamData = examDataList;
+            totalPages = (filteredExamData.length / itemsPerPage).ceil();
+            updatePaginatedData();
+            isLoading = false;
+            exams = examDataList;
+          });
+          return examDataList;
+        } else {
+          throw Exception('invalid data format');
+        }
+      }else{
+        throw Exception('Failed to fetch exam data. status code ${dat.statusCode}');
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: 'Eror: $e');
+     return [];
+    }
+  }
+  void applyFilter() {
+  setState(() {
+    filteredExamData = allExamData.where((exam) {
+      bool matchesBranch = selectedBranch == 'Semua Cabang' || exam.kantorCabang == selectedBranch;
+      bool matchesMonth = selectedMonth == 'Semua Bulan' || 
+          DateTime.parse(exam.tanggal_pengisian).month == months.indexOf(selectedMonth);
+      return matchesBranch && matchesMonth;
+    }).toList();
+    filteredExamData.sort((a, b) => a.nama.compareTo(b.nama)); // Urutkan berdasarkan nama
+    currentPage = 1;
+    totalPages = (filteredExamData.length / itemsPerPage).ceil();
+    updatePaginatedData();
+  });
+  print('Applied Filters: Branch - $selectedBranch, Month - $selectedMonth');
+  print('Filtered Data Count: ${filteredExamData.length}');
+}
+
+void updatePaginatedData() {
+  int startIndex = (currentPage - 1) * itemsPerPage;
+  int endIndex = startIndex + itemsPerPage;
+
+  setState(() {
+    paginatedExamData = filteredExamData.sublist(startIndex, endIndex.clamp(0, filteredExamData.length));
+  });
+}
+
+void goToNextPage() {
+    if (currentPage < totalPages) {
+      setState(() {
+        currentPage++;
+        updatePaginatedData();
+      });
+    }
+  }
+  void goToPreviousPage() {
+    if (currentPage > 1) {
+      setState(() {
+        currentPage--;
+        updatePaginatedData();
+      });
+    }
+  }
+
+
+  void showErrorDialog(String message) {
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.error,
+      title: 'Error',
+      desc: message,
+      btnOkOnPress: () {},
+    ).show();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-        'Exam', 
-        style: TextStyle(color: Colors.white, fontSize: 20) // Ubah ukuran font di sini
-      ),
+          'Exam',
+          style: TextStyle(color: Colors.white, fontSize: 20),
+        ),
         backgroundColor: const Color(0xFF007BFF),
         centerTitle: true,
         leading: IconButton(
@@ -71,69 +159,50 @@ class _ExamAppState extends State<ExamApp> {
             Navigator.pop(context);
           },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: () {
-              // Add search functionality here
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(10.0),
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Cabang:', style: TextStyle(fontSize: 14)), // Ubah ukuran font
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedBranch,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedBranch = newValue ?? 'All';
-                          });
-                        },
-                        items: branches
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, style: const TextStyle(fontSize: 14)), // Ubah ukuran font
-                          );
-                        }).toList(),
-                      ),
-                    ],
+                  child: DropdownButton<String>(
+                    value: selectedBranch,
+                    isExpanded: true,
+                    items: branches.map((branch) {
+                      return DropdownMenuItem(
+                        value: branch,
+                        child: Text(branch),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedBranch = value!;
+                        applyFilter();
+                      });
+                    },
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Bulan:', style: TextStyle(fontSize: 14)), // Ubah ukuran font
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedMonth,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedMonth = newValue ?? 'All';
-                          });
-                        },
-                        items: months
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, style: const TextStyle(fontSize: 14)), // Ubah ukuran font
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
+                  child: DropdownButton<String>(
+                    value: selectedMonth,
+                    isExpanded: true,
+                    items: months.map((month) {
+                      return DropdownMenuItem(
+                        value: month,
+                        child: Text(month),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedMonth = value!;
+                        applyFilter(); // Panggil applyFilter untuk memperbarui data berdasarkan bulan yang dipilih
+                      });
+                    },
+                  )
+
                 ),
               ],
             ),
@@ -145,210 +214,276 @@ class _ExamAppState extends State<ExamApp> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: Table(
-                      border: TableBorder.all(color: Colors.grey),
-                      columnWidths: const {
-                        0: FixedColumnWidth(40),
-                        1: FixedColumnWidth(100),
-                        2: FixedColumnWidth(100),
-                        3: FixedColumnWidth(60),
-                        4: FixedColumnWidth(60),
-                      },
-                      children: [
-                        TableRow(
-                          decoration: BoxDecoration(color: Colors.grey),
+              child: exams.isEmpty
+                  ? const Center(child: CircularProgressIndicator()) // Indikator loading
+                  : SingleChildScrollView( // Membungkus dengan SingleChildScrollView untuk scroll vertikal
+                      scrollDirection: Axis.vertical, // Tentukan arah scroll vertikal
+                      child: SingleChildScrollView( // Scroll horizontal untuk mendukung tabel lebih lebar
+                        scrollDirection: Axis.horizontal,
+                        child: Table(
+                          border: TableBorder.all(color: Colors.grey),
+                          columnWidths: const {
+                            0: FixedColumnWidth(40),
+                            1: FixedColumnWidth(100),
+                            2: FixedColumnWidth(100),
+                            3: FixedColumnWidth(100),
+                          
+                          },
                           children: [
-                            tableCell('No', isHeader: true),
-                            tableCell('Nama', isHeader: true),
-                            tableCell('Jabatan', isHeader: true),
-                            tableCell('Materi', isHeader: true),
-                            tableCell('Skor', isHeader: true),
-                          ],
-                        ),
-                        ...employees.asMap().entries.map((entry) {
-                          int index = entry.key + 1;
-                          Map<String, dynamic> employee = entry.value;
-                          return TableRow(
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
+                            TableRow(
+                              decoration: BoxDecoration(color: Colors.grey),
+                              children: [
+                                tableCell('No', isHeader: true),
+                                tableCell('Nama', isHeader: true),
+                                tableCell('Jabatan', isHeader: true),
+                              
+                                tableCell('Skor', isHeader: true),
+                              ],
                             ),
-                            children: [
-                              tableCell(index.toString()), // Kolom No
-                              GestureDetector(
-                                onTap: () {
-                                  // Navigate to detail page on row tap
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => DetailPage(
-                                        employee: employee,
+                            ...paginatedExamData.asMap().entries.map((entry) {
+                              int index = entry.key + 1;
+                              Exam exam = entry.value;
+                              return TableRow(
+                                children: [
+                                  tableCell(index.toString()),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => DetailPage(exam: exam),
                                       ),
-                                    ),
-                                  );
-                                },
-                                child: tableCell(employee['name'] ?? 'N/A'), // Kolom Nama
-                              ),
-                              tableCell(employee['position'] ?? 'N/A'), // Kolom Jabatan
-                              tableCell(employee['material'] ?? 'N/A'), // Kolom Materi
-                              tableCell(employee['score'] ?? 'N/A'), // Kolom Skor
-                            ],
-                          );
-                        }).toList(),
-                      ],
-                    ),
+                                    );
+
+                                    },
+                                    child: tableCell(exam.nama),
+                                  ),
+                                  tableCell(exam.jabatan),
+                                  tableCell(exam.nilai),
+                                ],
+                              );
+                            }).toList(),
+
+                    ],
                   ),
-                );
-              },
+                ),
+              ),
             ),
-          ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: goToPreviousPage,
+                  child: const Text('Back'),
+                ),
+                Text('Page $currentPage of $totalPages'),
+                TextButton(
+                  onPressed: goToNextPage,
+                  child: const Text('Next'),
+                ),
+              ],
+            ),
         ],
       ),
     );
   }
+  String _formatDate(String createdAt) {
+  try {
+    DateTime date = DateTime.parse(createdAt);  // Parse string menjadi DateTime
+    return DateFormat('dd MMM yyyy').format(date);  // Format tanggal menjadi "dd MMM yyyy"
+  } catch (e) {
+    return 'Invalid Date';  // Jika gagal, tampilkan 'Invalid Date'
+  }
+}
+List<Exam> _getUniqueExam() {
+    final Set<String> seenNames = {};
+    final List<Exam> uniqueExams = [];
+
+    for (var exam in exams) {
+      if (!seenNames.contains(exam.nama)) {
+        seenNames.add(exam.nama);
+        uniqueExams.add(exam);
+      }
+    }
+    return uniqueExams;
+  }
+  int _getAccessCount(String name) {
+    return exams.where((exam) => exam.nama == name).length;
+  }
 
   Widget tableCell(String text, {bool isHeader = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+      padding: const EdgeInsets.all(8.0),
       child: Text(
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 14, // Ubah ukuran font menjadi 14
+          fontSize: 14,
           fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-          color: isHeader ? Colors.black : Colors.black87,
         ),
       ),
     );
   }
 }
+class Exam {
+  final String nama;
+  final String jabatan;
+  final String profil;
+  final String usia;
+  final String created_at;
+  final String nip;
+  final String kategori;
+  final String kantorCabang;
+  final String tanggal_pengisian;
+  final String nilai;
 
-class DetailPage extends StatelessWidget {
-  final Map<String, dynamic> employee;
+  Exam({
+    required this.nama,
+    required this.jabatan,
+    required this.profil,
+    required this.usia,
+    required this.created_at,
+    required this.nip,
+    required this.kategori,
+    required this.kantorCabang,
+    required this.tanggal_pengisian,
+    required this.nilai
 
-  const DetailPage({Key? key, required this.employee}) : super(key: key);
+  });
+  factory Exam.fromJson(Map<String, dynamic> json) {
+  return Exam(
+    nama: json['nama'] ?? '',  
+    jabatan: json['jabatan'] ?? '',  
+    profil: json['profil'] ?? '',
+    usia: json['usia'].toString(),  
+    created_at: json['created_at'].toString() ?? '',
+    nip: json['nip'].toString(),  
+    kategori: json['kategori'] ?? '',  
+    kantorCabang: json['kantor_cabang'] ?? '',
+    tanggal_pengisian: json['tanggal_pengisian'] ?? '',
+    nilai: json['nilai'] ?? '',  
+  );
+}
+}
+
+class DetailPage extends StatefulWidget {
+  final Exam exam;
+
+  const DetailPage({Key? key, required this.exam}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Detail',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF007BFF),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Row(
+  _DetailPageState createState() => _DetailPageState();
+}
+
+class _DetailPageState extends State<DetailPage> {
+  List<Map<String, dynamic>> exam = []; // Data pegawai yang akan ditampilkan
+  bool isLoading = false; // Indikator loading
+
+  @override
+  void initState() {
+    super.initState();
+    // fetchEmployeeData(); // Memuat data pegawai berdasarkan nama yang diterima
+  }
+
+
+@override
+Widget build(BuildContext context) {
+  final exam = widget.exam;
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Detail',
+      style: TextStyle(color: Colors.white),),
+      backgroundColor: const Color(0xFF007BFF),
+      centerTitle: true,
+      iconTheme: const IconThemeData(color: Colors.white),
+    ),
+    body: isLoading
+        ? const Center(child: CircularProgressIndicator()) // Loading indicator
+        : SingleChildScrollView(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
-                  radius: 40,
-                  backgroundImage: AssetImage('assets/images/profile.jpeg'),
-                ),
-                const SizedBox(width: 16),
-                Column(
+                Padding(padding: EdgeInsets.all(16.0),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      employee['name'] ?? 'N/A',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), // Ubah ukuran font
+                    Container(
+                      width: 75,
+                      height: 75  ,
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(30),
+                        image: DecorationImage(
+                          image: exam.profil.isNotEmpty
+                              ? (exam.profil.startsWith('http')
+                                  ? NetworkImage(exam.profil) // URL gambar
+                                  : AssetImage(exam.profil) as ImageProvider) // Path lokal
+                              : const AssetImage('assets/images/default.jpg'), // Gambar default
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      employee['position'] ?? 'N/A',
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF007BFF)), // Ubah ukuran font
-                    ),
-                    const SizedBox(height: 4),
-                    const Text('NIP: 0988767656s657897', style: TextStyle(fontSize: 14)), // Ubah ukuran font
-                    const Text('Usia: 25 Tahun', style: TextStyle(fontSize: 14)), // Ubah ukuran font
-                    const Text('Kantor: Kantor Pusat Operasional', style: TextStyle(fontSize: 14)), // Ubah ukuran font
-                    const SizedBox(height: 4),
-                    Row(
+
+                    const SizedBox(width: 16,),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'INDEX RATA-RATA KPI 4.0',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF007BFF),
-                            fontSize: 14, // Ubah ukuran font
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Row(
-                          children: const [
-                            Icon(Icons.star, color: Colors.amber, size: 15),
-                            Icon(Icons.star, color: Colors.amber, size: 15),
-                            Icon(Icons.star, color: Colors.amber, size: 15),
-                            Icon(Icons.star, color: Colors.amber, size: 15),
-                            Icon(Icons.star_border, color: Colors.amber, size: 15),
-                          ],
-                        ),
+                        Text(
+                  exam.nama,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  exam.jabatan,
+                  style: const TextStyle(
+                      fontSize: 14, color: Color(0xFF007BFF)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'NIP: ${exam.nip}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Usia: ${exam.usia} Tahun',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Kantor: ${exam.kantorCabang}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Kategori: ${exam.kategori}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Nilai: ${exam.nilai}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Text(
+                  'Tanggal Pengisian: ${DateFormat('dd MMM yyyy').format(DateTime.parse(exam.tanggal_pengisian))}',
+                  style: const TextStyle(fontSize: 14),
+                ),
                       ],
-                    ),
+                    ))
                   ],
                 ),
+                ),
+                
+                
               ],
             ),
-            const SizedBox(height: 16),
-            Table(
-              border: TableBorder.all(color: Colors.grey),
-              columnWidths: const {
-                0: FixedColumnWidth(50), // Ubah lebar kolom No
-                1: FixedColumnWidth(110), // Ubah lebar kolom Tanggal
-                2: FixedColumnWidth(145), // Ubah lebar kolom Materi
-                3: FixedColumnWidth(60), // Ubah lebar kolom Skor
-              },
-              children: [
-                TableRow(
-                  decoration: BoxDecoration(color: Colors.blue[50]),
-                  children: [
-                    tableCell('No', isHeader: true),
-                    tableCell('Tanggal', isHeader: true),
-                    tableCell('Materi', isHeader: true),
-                    tableCell('Skor', isHeader: true),
-                  ],
-                ),
-                // Update material numbers with date
-                TableRow(
-                  children: [
-                    tableCell('1'), // Material 1
-                    tableCell('2024-10-24'), // Example date for Material 1
-                    tableCell('Merancang UI/UX'), // Material name
-                    tableCell('85'),
-                  ],
-                ),
-                TableRow(
-                  children: [
-                    tableCell('2'), // Material 2
-                    tableCell('2024-10-25'), // Example date for Material 2
-                    tableCell('Frontend Developer'), // Material name
-                    tableCell('90'),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+    
+  );
+}
 
   Widget tableCell(String text, {bool isHeader = false}) {
     return Padding(
@@ -363,10 +498,4 @@ class DetailPage extends StatelessWidget {
       ),
     );
   }
-}
-
-void main() {
-  runApp(const MaterialApp(
-    home: ExamApp(),
-  ));
 }

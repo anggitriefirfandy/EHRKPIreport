@@ -1,10 +1,100 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:kpi/halamanutama.dart';
+import 'dart:convert';
+import 'dart:developer';
 
-class LoginPage extends StatelessWidget {
+import 'package:awesome_dialog/awesome_dialog.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:kpi/api/api.dart';
+import 'package:kpi/halamanutama.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  bool _isLoading = false;
+  int _constat = 1; // Misalnya, 1 berarti koneksi tersedia
+  String _errorMessage = '';
+
+  // Fungsi login
+  void _login() async {
+    print('mulai login');
+    if (_constat == 0) {
+      AwesomeDialog(
+        context: context,
+        dialogType: DialogType.infoReverse,
+        headerAnimationLoop: false,
+        animType: AnimType.bottomSlide,
+        title: 'INFO',
+        desc: 'Login hanya bisa dilakukan saat indikator koneksi berwarna hijau',
+      ).show();
+    } else if (!_isLoading) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      String email = emailController.text.trim();
+      String password = passwordController.text.trim();
+
+      if (email.isEmpty || password.isEmpty) {
+        Fluttertoast.showToast(msg: "Email dan password tidak boleh kosong.");
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      var data = {'email': email, 'password': password, 'device': 'Mobile EHR'};
+      var res = await ApiHandler().authData(data, '/login');
+      var body = jsonDecode(res.body);
+
+      if (res.statusCode == 200 && body['success']) {
+        SharedPreferences locStor = await SharedPreferences.getInstance();
+        locStor.setString('token', jsonEncode(body['token']));
+        locStor.setString('user', jsonEncode(body['user']));
+        log("Token disimpan: ${body['token']}");
+
+        String? infmsg = body['infomessage']?.toString();
+        String? alrmsg = body['alertmessage']?.toString();
+
+        Get.off(() => HomeScreen(
+              prevPage: '',
+              infoPop: infmsg,
+              alertPop: alrmsg,
+            ));
+      } else {
+        String m = body['message'].toString();
+        if (m.toLowerCase().contains('server error') ||
+            m.toLowerCase().contains('timed out')) {
+          m = 'Koneksi Bermasalah';
+        }
+        AwesomeDialog(
+          context: context,
+          dialogType: DialogType.infoReverse,
+          headerAnimationLoop: false,
+          animType: AnimType.bottomSlide,
+          title: 'INFO',
+          desc: m,
+        ).show();
+        setState(() {
+          _errorMessage = m;
+        });
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,144 +187,116 @@ class LoginPage extends StatelessWidget {
 
   // Function to show login bottom sheet
   void _showLoginBottomSheet(BuildContext context) {
-    final TextEditingController emailController = TextEditingController();
-    final TextEditingController passwordController = TextEditingController();
+  // final TextEditingController emailController = TextEditingController();
+  // final TextEditingController passwordController = TextEditingController();
 
-    // Password visibility state
-    bool _isObscure = true;
+  bool _isObscure = true; // Password visibility state
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true, // Allows the sheet to adjust to the keyboard
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(25),
-        ),
-      ),
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setState) {
-            // Padding to adjust to the keyboard
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16.0,
-                right: 16.0,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20, // Extra bottom padding
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Cancel button on the top-left
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        child: Text('Batalkan', style: TextStyle(color: Color(0xFF007BFF))),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-
-                    // Title of the dialog
-                    Text(
-                      'Login',
-                      style: GoogleFonts.poppins(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-
-                    // Email field
-                    TextField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.person),
-                        labelText: 'Email',
-                        hintText: 'Example@ehr.co.id',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 15),
-
-                    // Password field with visibility toggle
-                    TextField(
-                      controller: passwordController,
-                      obscureText: _isObscure, // Toggle this
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.lock),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isObscure ? Icons.visibility : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            // Update visibility state
-                            setState(() {
-                              _isObscure = !_isObscure;
-                            });
-                          },
-                        ),
-                        labelText: 'Password',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 30),
-
-                    // Login button
-                    ElevatedButton(
-                      onPressed: () {
-                        // Perform login logic here
-                        String email = emailController.text;
-                        String password = passwordController.text;
-
-                        // Example login logic, replace with your actual validation
-                        if (email == 'akarindo@ehr.co.id' && password == '1234567890') {
-                          // Navigate to MainPage if login is successful
-                          Navigator.of(context).pop(); // Close the bottom sheet
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (context) => const HomeScreen()),
-                          );
-                        } else {
-                          // Show error message if login fails
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Invalid email or password')),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Color(0xFF007BFF),
-                        minimumSize: Size(200, 50), // Set a specific width, e.g., 200
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+    ),
+    builder: (BuildContext context) {
+      return StatefulBuilder(
+        builder: (BuildContext context, StateSetter setState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16.0,
+              right: 16.0,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
                       child: Text(
-                        'Login',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        'Batalkan',
+                        style: TextStyle(color: Color(0xFF007BFF)),
                       ),
                     ),
-                    SizedBox(height: 20),
-                  ],
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'Login',
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.person),
+                      labelText: 'Email',
+                      hintText: 'Example@ehr.co.id',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 15),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.lock),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isObscure ? Icons.visibility : Icons.visibility_off,
+                        ),
+                        onPressed: () => setState(() {
+                          _isObscure = !_isObscure;
+                        }),
+                      ),
+                      labelText: 'Password',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 30),
+                  ElevatedButton(
+                  onPressed: _login, // Panggil fungsi login di sini
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: const Color(0xFF007BFF),
+                    minimumSize: const Size(200, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                      : Text(
+                          'Login',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
+                  SizedBox(height: 20),
+                ],
               ),
-            );
-          },
-        );
-      },
-    );
-  }
+            ),
+          );
+        },
+      );
+    },
+  );
 }
+}
+
 
 // Custom clipper for the curved background shape
 class BackgroundClipper extends CustomClipper<Path> {

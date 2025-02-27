@@ -1,4 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:kpi/api/api.dart';
 
 class ElibraryApp extends StatefulWidget {
   const ElibraryApp({Key? key}) : super(key: key);
@@ -8,69 +13,137 @@ class ElibraryApp extends StatefulWidget {
 }
 
 class _ElibraryAppState extends State<ElibraryApp> {
-  final List<String> branches = [
-    'All',
-    'Kantor Pusat',
-    'Kantor Cabang 1',
-    'Kantor Cabang 2'
-  ];
+  late Future<List<Employee>> futureEmployee;
+  List<Employee> allLibraryData = [];
+  List<Employee> filteredLibraryData = [];
+  List<Employee> paginatedLibraryData = [];
+   int currentPage = 1;
+  final int itemsPerPage = 10; // Jumlah data per halaman
+  List<String> branches = ['Semua Cabang'];
+  int totalPages = 1;
   final List<String> months = [
-    'All',
-    'January',
-    'February',
-    'March',
+    'Semua Bulan',
+    'Januari',
+    'Februari',
+    'Maret',
     'April',
-    'May',
-    'June',
-    'July',
-    'August',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
     'September',
-    'October',
+    'Oktober',
     'November',
-    'December'
+    'Desember'
   ];
 
-  String selectedBranch = 'All';
-  String selectedMonth = 'All';
+  String selectedBranch = 'Semua Cabang';
+  String selectedMonth = 'Semua Bulan';
+  List<Employee> employees = [];
+  bool isLoading = true;
 
-  final List<Map<String, dynamic>> employees = [
-    {
-      "name": "Mawar Eva de Jongh",
-      "accessCount": "3 kali",
-      "position": "Front end Developer",
-      "nip": "0988767656s657897",
-      "age": "25 Tahun",
-      "office": "Kantor Pusat Operasional",
-      "books": [
-        {"title": "Managing the digital: paradigms Leadership & organization", "count": "2 kali"},
-        {"title": "Literature, science and public policy from Darwin to genomics", "count": "1 kali"},
-      ]
-    },
-    {
-      "name": "Bryan Domani",
-      "accessCount": "5 kali",
-      "position": "Backend Developer",
-      "nip": "1234567890",
-      "age": "30 Tahun",
-      "office": "Kantor Cabang 1",
-      "books": [
-        {"title": "Understanding AI: Principles and Applications", "count": "3 kali"},
-        {"title": "Data Science for Beginners", "count": "2 kali"},
-      ]
-    },
-    {
-      "name": "Iqbal Ramadhan",
-      "accessCount": "7 kali",
-      "position": "Data Scientist",
-      "nip": "0987654321",
-      "age": "28 Tahun",
-      "office": "Kantor Cabang 2",
-      "books": [
-        {"title": "Machine Learning Basics", "count": "4 kali"},
-        {"title": "Deep Learning Explained", "count": "2 kali"},
-      ]
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    futureEmployee = getLibraryData();
+  }
+  Future<List<Employee>> getLibraryData() async {
+    
+    try {
+      String month = months.indexOf(selectedMonth).toString(); // Mendapatkan bulan sebagai string
+    String year = DateTime.now().year.toString();
+      var url = '/libraryreport?month=$month&year=$year';
+      print('Fetching data with filters - Month: $month, Year: $year'); 
+      var dat = await ApiHandler().getData(url);
+    //    print('Status Code: ${dat.statusCode}');
+    // print('Response Body: ${dat.body}');
+      if (dat.statusCode == 200 && dat.body != null) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+        print('Decoded JSON: $jsonResponse');
+        if (jsonResponse.containsKey('data')&& jsonResponse['data'] is List) {
+          final List<dynamic> data = jsonResponse['data'];
+           print('Raw Data: $data');
+          List<Employee> libraryDataList = 
+          data.map((item) => Employee.fromJson(item)).toList();
+          libraryDataList.sort((a, b) => a.nama.compareTo(b.nama));
+
+          final branchSet = <String>{'Semua Cabang'};
+          for (var libraryData in libraryDataList) {
+            branchSet.add(libraryData.kantorCabang);
+          }
+          setState(() {
+            branches = branchSet.toList();
+            allLibraryData = libraryDataList;
+            filteredLibraryData = libraryDataList;
+            totalPages = (filteredLibraryData.length / itemsPerPage).ceil();
+            updatePaginatedData();
+            isLoading = false;
+            employees = libraryDataList;
+          });
+          return libraryDataList;
+        }else {
+          throw Exception('invalid data format');
+        }
+      }else {
+        throw Exception('Failed to fetch library data. status code: ${dat.statusCode}');
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: 'Eror: $e');
+      return [];
+    }
+  }
+
+  void applyFilter() {
+  setState(() {
+    filteredLibraryData = allLibraryData.where((library) {
+      bool matchesBranch = selectedBranch == 'Semua Cabang' || library.kantorCabang == selectedBranch;
+      bool matchesMonth = selectedMonth == 'Semua Bulan' || 
+          DateTime.parse(library.created_at).month == months.indexOf(selectedMonth);
+      return matchesBranch && matchesMonth;
+    }).toList();
+    filteredLibraryData.sort((a, b) => a.nama.compareTo(b.nama)); // Urutkan berdasarkan nama
+    currentPage = 1;
+    totalPages = (filteredLibraryData.length / itemsPerPage).ceil();
+    updatePaginatedData();
+  });
+  print('Applied Filters: Branch - $selectedBranch, Month - $selectedMonth');
+  print('Filtered Data Count: ${filteredLibraryData.length}');
+}
+
+  void updatePaginatedData() {
+  int startIndex = (currentPage - 1) * itemsPerPage;
+  int endIndex = startIndex + itemsPerPage;
+
+  setState(() {
+    paginatedLibraryData = filteredLibraryData.sublist(startIndex, endIndex.clamp(0, filteredLibraryData.length));
+  });
+}
+
+  void goToNextPage() {
+    if (currentPage < totalPages) {
+      setState(() {
+        currentPage++;
+        updatePaginatedData();
+      });
+    }
+  }
+  void goToPreviousPage() {
+    if (currentPage > 1) {
+      setState(() {
+        currentPage--;
+        updatePaginatedData();
+      });
+    }
+  }
+  Widget tableCellWithIcon(IconData iconData, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: IconButton(
+        icon: Icon(iconData, color: const Color(0xFF007BFF)),
+        onPressed: onTap,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,139 +160,163 @@ class _ElibraryAppState extends State<ElibraryApp> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: EmployeeSearchDelegate(employees), // Call the search delegate
-              );
-            },
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: getLibraryData,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Cabang:', style: TextStyle(fontSize: 14)),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedBranch,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedBranch = newValue ?? 'All';
-                          });
-                        },
-                        items: branches
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, style: const TextStyle(fontSize: 14)),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Bulan:', style: TextStyle(fontSize: 14)),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedMonth,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedMonth = newValue ?? 'All';
-                          });
-                        },
-                        items: months
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, style: const TextStyle(fontSize: 14)),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'List Akses Perpustakaan',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: Table(
-                      border: TableBorder.all(color: Colors.grey),
-                      columnWidths: const {
-                        0: FixedColumnWidth(40), // Kolom 'No', ukuran tetap
-                        1: FixedColumnWidth(100), // Kolom 'Nama', ukuran tetap
-                        2: FixedColumnWidth(100), // Kolom 'Akses Elibrary', ukuran tetap
-                        3: FixedColumnWidth(60),  // Kolom 'Detail', ukuran tetap
-                      },
-                      children: [
-                        // Header dengan latar belakang biru muda
-                        TableRow(
-                          decoration: BoxDecoration(color: Colors.grey),
-                          children: [
-                            tableCell('No', isHeader: true),
-                            tableCell('Nama', isHeader: true),
-                            tableCell('Akses Elibrary', isHeader: true),
-                            tableCell('Detail', isHeader: true),
-                          ],
-                        ),
-                        // Baris data pegawai
-                        ...employees.asMap().entries.map((entry) {
-                          int index = entry.key + 1;
-                          Map<String, dynamic> employee = entry.value;
-                          return TableRow(
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                            ),
-                            children: [
-                              tableCell(index.toString()), // Kolom No
-                              tableCell(employee['name']), // Kolom Nama
-                              tableCell(employee['accessCount']), // Kolom Akses Elibrary
-                              tableCellWithIcon(Icons.description, () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => DetailPage(employee: employee),
-                                  ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : employees.isEmpty
+              ? const Center(child: Text('No data available'))
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButton<String>(
+                              value: selectedBranch,
+                              isExpanded: true,
+                              items: branches.map((branch) {
+                                return DropdownMenuItem(
+                                  value: branch,
+                                  child: Text(branch),
                                 );
-                              }), // Kolom Detail
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedBranch = value!;
+                                  applyFilter();
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: DropdownButton<String>(
+                              value: selectedMonth,
+                              isExpanded: true,
+                              items: months.map((month) {
+                                return DropdownMenuItem(
+                                  value: month,
+                                  child: Text(month),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedMonth = value!;
+                                  applyFilter(); // Panggil applyFilter untuk memperbarui data berdasarkan bulan yang dipilih
+                                });
+                              },
+                            )
+
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'List Akses Perpustakaan',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SingleChildScrollView(  // Menambahkan satu level SingleChildScrollView
+                          child: Table(
+                            border: TableBorder.all(color: Colors.grey),
+                            columnWidths: const {
+                              0: FixedColumnWidth(40),
+                              1: FixedColumnWidth(100),
+                              2: FixedColumnWidth(100),
+                              3: FixedColumnWidth(100),
+                            },
+                            children: [
+                              TableRow(
+                                decoration: BoxDecoration(color: Colors.grey),
+                                children: [
+                                  tableCell('No', isHeader: true),
+                                  tableCell('Nama', isHeader: true),
+                                  tableCell('Tanggal Akses', isHeader: true),
+                                  tableCell('Detail', isHeader: true),
+                                ],
+                              ),
+                              ...paginatedLibraryData.asMap().entries.map((entry) {
+                                int index = entry.key + 1;
+                                Employee employee = entry.value;
+                                return TableRow(
+                                  children: [
+                                    tableCell(index.toString()),
+                                    tableCell(employee.nama),
+                                    tableCell(_formatDate(employee.created_at)),
+                                    tableCellWithIcon(
+                                      Icons.document_scanner_outlined,
+                                      () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => DetailPage(employee: employee),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
                             ],
-                          );
-                        }).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: goToPreviousPage,
+                          child: const Text('Back'),
+                        ),
+                        Text('Page $currentPage of $totalPages'),
+                        TextButton(
+                          onPressed: goToNextPage,
+                          child: const Text('Next'),
+                        ),
                       ],
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+                  ],
+                ),
     );
+  }
+String _formatDate(String createdAt) {
+  try {
+    DateTime date = DateTime.parse(createdAt);  // Parse string menjadi DateTime
+    return DateFormat('dd MMM yyyy').format(date);  // Format tanggal menjadi "dd MMM yyyy"
+  } catch (e) {
+    return 'Invalid Date';  // Jika gagal, tampilkan 'Invalid Date'
+  }
+}
+
+  // Mengambil daftar unik berdasarkan nama
+  List<Employee> _getUniqueEmployees() {
+    final Set<String> seenNames = {};
+    final List<Employee> uniqueEmployees = [];
+
+    for (var employee in employees) {
+      if (!seenNames.contains(employee.nama)) {
+        seenNames.add(employee.nama);
+        uniqueEmployees.add(employee);
+      }
+    }
+    return uniqueEmployees;
+  }
+
+  // Menghitung berapa kali nama muncul
+  int _getAccessCount(String name) {
+    return employees.where((employee) => employee.nama == name).length;
   }
 
   Widget tableCell(String text, {bool isHeader = false}) {
@@ -229,113 +326,65 @@ class _ElibraryAppState extends State<ElibraryApp> {
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 14, // Set font size to 14
+          fontSize: 14,
           fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-          color: isHeader ? Colors.black : Colors.black87,
         ),
       ),
     );
   }
-
-  Widget tableCellWithIcon(IconData iconData, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: IconButton(
-        icon: Icon(iconData, color: const Color(0xFF007BFF)),
-        onPressed: onTap,
-      ),
-    );
-  }
 }
 
-class EmployeeSearchDelegate extends SearchDelegate {
-  final List<Map<String, dynamic>> employees;
+class Employee {
+  final String nama;
+  final String jabatan;
+  final String profil;
+  final String usia;
+  final String created_at;
+  final String nip;
+  final String namaBuku;
+  final String kantorCabang;
 
-  EmployeeSearchDelegate(this.employees);
+  Employee({
+    required this.nama,
+    required this.jabatan,
+    required this.profil,
+    required this.usia,
+    required this.created_at,
+    required this.nip,
+    required this.namaBuku,
+    required this.kantorCabang,
+  });
 
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, null);
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    List<Map<String, dynamic>> matchQuery = [];
-    for (var employee in employees) {
-      if (employee['name'].toLowerCase().contains(query.toLowerCase())) {
-        matchQuery.add(employee);
-      }
-    }
-
-    return ListView.builder(
-      itemCount: matchQuery.length,
-      itemBuilder: (context, index) {
-        var result = matchQuery[index];
-        return ListTile(
-          title: Text(result['name']),
-          subtitle: Text(result['position']),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DetailPage(employee: result),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    List<Map<String, dynamic>> matchQuery = [];
-    for (var employee in employees) {
-      if (employee['name'].toLowerCase().contains(query.toLowerCase())) {
-        matchQuery.add(employee);
-      }
-    }
-
-    return ListView.builder(
-      itemCount: matchQuery.length,
-      itemBuilder: (context, index) {
-        var result = matchQuery[index];
-        return ListTile(
-          title: Text(result['name']),
-          subtitle: Text(result['position']),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DetailPage(employee: result),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+  factory Employee.fromJson(Map<String, dynamic> json) {
+  return Employee(
+    nama: json['nama'] ?? '',  
+    jabatan: json['jabatan'] ?? '',  
+    profil: json['profil'] ?? '',
+    usia: json['usia'].toString(),  
+    created_at: json['created_at'].toString() ?? '',
+    nip: json['nip'].toString(),  
+    namaBuku: json['nama_buku'] ?? '',  
+    kantorCabang: json['kantor_cabang'] ?? '',  
+  );
 }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class DetailPage extends StatelessWidget {
-  final Map<String, dynamic> employee; // Accepts the employee data
+  final Employee employee;
 
   const DetailPage({Key? key, required this.employee}) : super(key: key);
 
@@ -365,88 +414,73 @@ class DetailPage extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
-                  radius: 40,
-                  backgroundImage: AssetImage('assets/images/profile.jpeg'),
-                ),
+                Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent,
+                      borderRadius: BorderRadius.circular(40),
+                      image: DecorationImage(
+                        image: employee.profil.isNotEmpty
+                            ? (employee.profil.startsWith('http')
+                                ? NetworkImage(employee.profil) // URL gambar
+                                : AssetImage(employee.profil) as ImageProvider) // Path lokal
+                            : const AssetImage('assets/images/default.jpg'), // Gambar default
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      employee['name'] ?? 'N/A',
+                      employee.nama,
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      employee['position'] ?? 'N/A',
+                      employee.jabatan,
                       style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF007BFF),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text('NIP: ${employee['nip'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-                    Text('Usia : ${employee['age'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-                    Text('Kantor : ${employee['office'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
+                    Text('NIP: ${employee.nip}'),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          'INDEX RATA-RATA KPI 4.0',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF007BFF),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Row(
-                          children: const [
-                            Icon(Icons.star, color: Colors.amber, size: 14),
-                            Icon(Icons.star, color: Colors.amber, size: 14),
-                            Icon(Icons.star, color: Colors.amber, size: 14),
-                            Icon(Icons.star, color: Colors.amber, size: 14),
-                            Icon(Icons.star_border, color: Colors.amber, size: 14),
-                          ],
-                        ),
-                      ],
-                    ),
+                    Text('Usia: ${employee.usia}'),
+                    const SizedBox(height: 4),
+                    Text('Kantor: ${employee.kantorCabang}'),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            // Book list section
+            const SizedBox(height: 20),
+            // Menampilkan buku yang dipinjam oleh karyawan
             Table(
-              border: TableBorder.all(color: Colors.grey),
-              columnWidths: const {
-                0: FractionColumnWidth(0.1),
-                1: FractionColumnWidth(0.7),
-                2: FractionColumnWidth(0.2),
-              },
+          border: TableBorder.all(color: Colors.grey),
+          columnWidths: const {
+            0: FractionColumnWidth(0.11), // Untuk kolom "No"
+            1: FractionColumnWidth(0.89), // Untuk kolom "Nama Buku"
+          },
+          children: [
+            TableRow(
+              decoration: BoxDecoration(color: Colors.blue[50]),
               children: [
-                TableRow(
-                  decoration: BoxDecoration(color: Colors.blue[50]),
-                  children: [
-                    tableCell('No', isHeader: true),
-                    tableCell('Nama Buku', isHeader: true),
-                    tableCell('Jumlah', isHeader: true),
-                  ],
-                ),
-                ...employee['books'].asMap().entries.map<TableRow>((entry) {
-                  int index = entry.key + 1;
-                  Map<String, dynamic> book = entry.value;
-                  return TableRow(
-                    children: [
-                      tableCell('$index'),
-                      tableCell(book['title']),
-                      tableCell(book['count']),
-                    ],
-                  );
-                }).toList(),
+                tableCell('No', isHeader: true),
+                tableCell('Nama Buku', isHeader: true),
               ],
             ),
+            TableRow(
+              children: [
+                tableCell('1'),
+                tableCell(employee.namaBuku), // Nama buku yang dipinjam
+              ],
+            ),
+          ],
+        ),
+
           ],
         ),
       ),
@@ -460,7 +494,7 @@ class DetailPage extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 14, // Set font size to 14
+          fontSize: 14,
           fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
         ),
       ),

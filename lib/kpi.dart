@@ -1,6 +1,15 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // for the line chart
-import 'package:percent_indicator/percent_indicator.dart'; // for circular indicators
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
+import 'package:kpi/api/api.dart';
+import 'package:kpi/widget/widgetkpi.dart';
+import 'package:percent_indicator/percent_indicator.dart';
+
+import 'widget/pertumbuhankinerja.dart'; // for circular indicators
 
 class KPIPage extends StatefulWidget {
   const KPIPage({Key? key}) : super(key: key);
@@ -35,18 +44,6 @@ class _KPIPageState extends State<KPIPage> with SingleTickerProviderStateMixin {
   String selectedBranch = 'All';
   String selectedMonth = 'All';
 
-  // Employee data
-  final List<Employee> employees = const [
-    Employee('Mawar Eva de Jongh', 'Front end Development', '09887676565657897', 'Kantor Pusat', 4.0),
-    Employee('Bryan Domani', 'Back end Development', '09887676565657897', 'Kantor Pusat', 4.0),
-    Employee('Iqbal Ramadhan', 'Back end Development', '09887676565657897', 'Kantor Cabang 1', 4.0),
-    Employee('Syifa Hadju', 'UI & UX', '09887676565657897', 'Kantor Cabang 2', 4.0),
-    Employee('Aisyah Aqillah', 'UI & UX', '09887676565657897', 'Kantor Pusat', 4.0),
-    Employee('Bastian Steel', 'Front end Development', '09887676565657897', 'Kantor Cabang 1', 4.0),
-  ];
-
-  List<Employee> filteredEmployees = [];
-
   @override
   void initState() {
     super.initState();
@@ -76,12 +73,12 @@ class _KPIPageState extends State<KPIPage> with SingleTickerProviderStateMixin {
           color: Colors.white,
         ),
          actions: [
-    IconButton(
-      icon: const Icon(Icons.search, color: Colors.white),
-      onPressed: () {
-        // Define search action here
-      },
-    ),
+    // IconButton(
+    //   icon: const Icon(Icons.search, color: Colors.white),
+    //   onPressed: () {
+    //     // Define search action here
+    //   },
+    // ),
   ],
         bottom: TabBar(
           controller: _tabController,
@@ -102,66 +99,65 @@ class _KPIPageState extends State<KPIPage> with SingleTickerProviderStateMixin {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Cabang:', style: TextStyle(fontWeight: FontWeight.normal)),
-                    SizedBox(
-                      width: 200, // Set a fixed width for the dropdown
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedBranch,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedBranch = newValue!;
-                          });
-                        },
-                        items: branches.map((String branch) {
-                          return DropdownMenuItem<String>(
-                            value: branch,
-                            child: Text(
-                              branch,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                          );
-                        }).toList(),
-                        style: const TextStyle(color: Colors.black),
-                        dropdownColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Bulan:', style: TextStyle(fontWeight: FontWeight.normal)),
-                    SizedBox(
-                      width: 140, // Set the same fixed width for the month dropdown
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedMonth,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedMonth = newValue!;
-                          });
-                        },
-                        items: months.map((String month) {
-                          return DropdownMenuItem<String>(
-                            value: month,
-                            child: Text(
-                              month,
-                              style: const TextStyle(fontWeight: FontWeight.w500)
-                            ),
-                          );
-                        }).t
-                        oList(),
-                        style: const TextStyle(color: Colors.black),
-                        dropdownColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+                // Column(
+                //   crossAxisAlignment: CrossAxisAlignment.start,
+                //   children: [
+                //     const Text('Cabang:', style: TextStyle(fontWeight: FontWeight.normal)),
+                //     SizedBox(
+                //       width: 200, // Set a fixed width for the dropdown
+                //       child: DropdownButton<String>(
+                //         isExpanded: true,
+                //         value: selectedBranch,
+                //         onChanged: (String? newValue) {
+                //           setState(() {
+                //             selectedBranch = newValue!;
+                //           });
+                //         },
+                //         items: branches.map((String branch) {
+                //           return DropdownMenuItem<String>(
+                //             value: branch,
+                //             child: Text(
+                //               branch,
+                //               style: const TextStyle(fontWeight: FontWeight.w500),
+                //             ),
+                //           );
+                //         }).toList(),
+                //         style: const TextStyle(color: Colors.black),
+                //         dropdownColor: Colors.white,
+                //       ),
+                //     ),
+                //   ],
+                // ),
+                // const SizedBox(width: 16),
+                // Column(
+                //   crossAxisAlignment: CrossAxisAlignment.start,
+                //   children: [
+                //     const Text('Bulan:', style: TextStyle(fontWeight: FontWeight.normal)),
+                //     SizedBox(
+                //       width: 140, // Set the same fixed width for the month dropdown
+                //       child: DropdownButton<String>(
+                //         isExpanded: true,
+                //         value: selectedMonth,
+                //         onChanged: (String? newValue) {
+                //           setState(() {
+                //             selectedMonth = newValue!;
+                //           });
+                //         },
+                //         items: months.map((String month) {
+                //           return DropdownMenuItem<String>(
+                //             value: month,
+                //             child: Text(
+                //               month,
+                //               style: const TextStyle(fontWeight: FontWeight.w500)
+                //             ),
+                //           );
+                //         }).toList(),
+                //         style: const TextStyle(color: Colors.black),
+                //         dropdownColor: Colors.white,
+                //       ),
+                //     ),
+                //   ],
+                // ),
               ],
             ),
           ),
@@ -180,125 +176,342 @@ class _KPIPageState extends State<KPIPage> with SingleTickerProviderStateMixin {
   }
 }
 
-class IndividuTab extends StatelessWidget {
+class IndividuTab extends StatefulWidget {
   const IndividuTab({Key? key}) : super(key: key);
 
-  final List<Employee> employees = const [
-    Employee('Mawar Eva de Jongh', 'Front end Development', '09887676565657897',
-        'Kantor Pusat', 4.0),
-    Employee('Bryan Domani', 'Back end Development', '09887676565657897',
-        'Kantor Pusat', 4.0),
-    Employee('Iqbal Ramadhan', 'Back end Development', '09887676565657897',
-        'Kantor Pusat', 4.0),
-    Employee('Syifa Hadju', 'UI & UX', '09887676565657897',
-        'Kantor Pusat', 4.0),
-    Employee('Aisyah Aqillah', 'UI & UX', '09887676565657897',
-        'Kantor Pusat', 4.0),
-    Employee('Bastian Steel', 'Front end Development', '09887676565657897',
-        'Kantor Pusat', 4.0),
-  ];
+  @override
+  _IndividuTabState createState() => _IndividuTabState();
+}
+class IndividuData {
+  final String pegawaiId;
+  final String nama_pegawai;
+  final String jabatan;
+  final String profil;
+  final String usia;
+  final String nip;
+  final String kantor_cabang;
+
+  IndividuData({
+    required this.pegawaiId,
+    required this.nama_pegawai,
+    required this.jabatan,
+    required this.profil,
+    required this.usia,
+    required this.nip,
+    required this.kantor_cabang,
+  });
+
+  factory IndividuData.fromJson(Map<String, dynamic> json) {
+    return IndividuData(
+      pegawaiId: json['pegawai_id'] ?? '',
+      nama_pegawai: json['nama_pegawai'] ?? '',
+      jabatan: json['jabatan'] ?? '',
+      profil: json['profil'] ?? '',
+      usia: json['usia'] != null ? json['usia'].toString() : '0',
+      nip: json['nip'] != null ? json['nip'].toString() : '',
+      kantor_cabang: json['kantor_cabang'] ?? '',
+    );
+  }
+}
+class _IndividuTabState extends State<IndividuTab> {
+  // final _formSearch = GlobalKey<FormBuilderState>();
+  List<IndividuData> individuDataList = [];
+  bool isLoading = true;
+  String search = "";
+  Timer? _debounce;
+  @override
+  void initState() {
+    super.initState();
+    fetchIndividuData();
+  }
+
+  Future<void> fetchIndividuData({String? query}) async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
+
+      String url = '/kpireport';
+      if (query != null && query.isNotEmpty) {
+        url += '?search=$query';
+      }
+
+      var dat = await ApiHandler().getData(url);
+      debugPrint('API Response Status Code: ${dat.statusCode}');
+
+      if (dat.statusCode == 200 && dat.body != null) {
+        final dynamic jsonResponse = jsonDecode(dat.body);
+        List<dynamic> data = jsonResponse is Map<String, dynamic> && jsonResponse.containsKey('data')
+            ? jsonResponse['data']
+            : (jsonResponse is List ? jsonResponse : []);
+
+        setState(() {
+          individuDataList = data.map((item) => IndividuData.fromJson(item)).toList();
+          isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to fetch data');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      Fluttertoast.showToast(msg: 'Error: $e');
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      fetchIndividuData(query: value);
+    });
+
+    setState(() {
+      search = value;
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: ListView.builder(
-        itemCount: employees.length,
-        itemBuilder: (context, index) {
-          return GestureDetector(
-            onTap: () {
-              if (employees[index].name == 'Mawar Eva de Jongh') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const KpiDetailPage(),
-                  ),
-                );
-              }
-            },
-            child: EmployeeCard(employee: employees[index], index: index + 1),
-          );
-        },
-      ),
+      child: Column(
+          children: [
+            Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: TextField(
+              onChanged: _onSearchChanged, // Panggil otomatis saat mengetik
+              decoration: InputDecoration(
+                labelText: "Search berdasarkan nama",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15.0),
+                ),
+                suffixIcon: Icon(Icons.search),
+              ),
+            ),
+          ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : individuDataList.isEmpty
+                      ? const Center(child: Text('No data found.'))
+                      : ListView.builder(
+                          itemCount: individuDataList.length,
+                          itemBuilder: (context, index) {
+                            final individu = individuDataList[index];
+                            return IndividuCard(individu: individu);
+                          },
+                        ),
+            ),
+          ],
+        ),
     );
   }
 }
 
-class EmployeeCard extends StatelessWidget {
-  const EmployeeCard({Key? key, required this.employee, required this.index})
-      : super(key: key);
+class IndividuCard extends StatelessWidget {
+  final IndividuData individu;
 
-  final Employee employee;
-  final int index;
+  const IndividuCard({Key? key, required this.individu}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$index. ${employee.name}',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              employee.role,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF007BFF)),
-            ),
-            const SizedBox(height: 4),
-            Text('NIP : ${employee.nip}'),
-            const SizedBox(height: 4),
-            Text('Kantor : ${employee.office}'),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Text(
-                  'INDEX RATA-RATA KPI ${employee.kpi.toStringAsFixed(1)}',
-                  style: const TextStyle(color: Color(0xFF007BFF)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DetailKPIPage(pegawaiId: individu.pegawaiId),
+                    ),
+                  );
+                },
+
+                // onTap: () async {
+                //   String apiUrl = '/detailkpireport/${individu.pegawai_id}';
+                  
+                //   try {
+                //     var response = await ApiHandler().getData(apiUrl);
+                //     debugPrint('API Response Status Code detail: ${response.statusCode}');
+                //     debugPrint('API Response Body detail: ${response.body}');
+                    
+                //     if (response.statusCode == 200) {
+                //       var jsonResponse = jsonDecode(response.body);
+                //       debugPrint('Detail KPI Data: $jsonResponse');
+                //     } else {
+                //       debugPrint('Gagal mengambil data KPI detail');
+                //     }
+                //   } catch (e) {
+                //     debugPrint('Error: $e');
+                //   }
+                // },
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(30),
+                        image: DecorationImage(
+                          image: individu.profil.isNotEmpty &&
+                                  Uri.tryParse(individu.profil)?.hasAbsolutePath ==
+                                      true
+                              ? NetworkImage(individu.profil)
+                              : const AssetImage('assets/images/default.jpg')
+                                  as ImageProvider,
+                                  fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            individu.nama_pegawai,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.black,
+                            ),
+                          ),
+                          Text(
+                            individu.jabatan,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'NIP: ${individu.nip}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Kantor: ${individu.kantor_cabang}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 5),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Row(
-                  children: List.generate(5, (index) {
-                    return Icon(
-                      index < employee.kpi.toInt()
-                          ? Icons.star
-                          : Icons.star_border,
-                      color: Colors.amber,
-                      size: 14,
-                    );
-                  }),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class Employee {
-  final String name;
-  final String role;
+class DetailKpiData {
+  final String pegawaiId;
+  final String nama;
+  final String profil;
   final String nip;
-  final String office;
-  final double kpi;
+  final String jabatan_pegawai;
+  final String kantor_cabang_pegawai;
+  final double skor;
 
-  const Employee(this.name, this.role, this.nip, this.office, this.kpi);
+  DetailKpiData({
+    required this.pegawaiId,
+    required this.nama,
+    required this.profil,
+    required this.nip,
+    required this.jabatan_pegawai,
+    required this.kantor_cabang_pegawai,
+    required this.skor,
+  });
+
+  factory DetailKpiData.fromJson(Map<String, dynamic> json) {
+  var pegawai = json['pegawai'] ?? {};
+  var kpiDetail = (json['kpi_detail'] as List?)?.isNotEmpty == true
+      ? json['kpi_detail'][0]
+      : {}; // Ambil data pertama dari kpi_detail jika ada
+
+  return DetailKpiData(
+    pegawaiId: pegawai['id'] ?? '',
+    nama: pegawai['nama'] ?? '',
+    nip: pegawai['nip'] ?? '',
+    profil: pegawai['profil'] ?? '',
+    jabatan_pegawai: pegawai['jabatan_pegawai'] ?? '',
+    kantor_cabang_pegawai: pegawai['kantor_cabang_pegawai'] ?? '',
+    skor: (kpiDetail['skor'] != null) ? double.tryParse(kpiDetail['skor'].toString()) ?? 0.0 : 0.0,
+  );
 }
 
-class KpiDetailPage extends StatelessWidget {
-  const KpiDetailPage({Key? key}) : super(key: key);
+}
+
+class DetailKPIPage extends StatefulWidget {
+  final String pegawaiId;
+
+  const DetailKPIPage({Key? key, required this.pegawaiId}) : super(key: key);
 
   @override
+  _DetailKPIPageState createState() => _DetailKPIPageState();
+}
+
+class _DetailKPIPageState extends State<DetailKPIPage> {
+  DetailKpiData? detailKpiData;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchDetailKpi();
+  }
+
+  Future<void> fetchDetailKpi() async {
+    String apiUrl = '/detailkpireport/${widget.pegawaiId}';
+
+    try {
+      var response = await ApiHandler().getData(apiUrl);
+      debugPrint('API Response Status Code: ${response.statusCode}');
+      debugPrint('API Response Body: ${response.body}', wrapWidth: 1045);
+
+      if (response.statusCode == 200) {
+        var jsonResponse = jsonDecode(response.body);
+        
+        setState(() {
+          detailKpiData = DetailKpiData.fromJson(jsonResponse);
+          isLoading = false;
+        });
+      } else {
+        debugPrint('Gagal mengambil data KPI detail');
+        setState(() => isLoading = false);
+      }
+    } catch (e) {
+      debugPrint('Error: $e');
+      setState(() => isLoading = false);
+    }
+  }
+  
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
@@ -319,7 +532,68 @@ Widget build(BuildContext context) {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildEmployeeInfo(),
+            Container(
+              width: double.infinity, // Membuat container memenuhi lebar yang tersedia
+              height: 150, // Mengatur tinggi container
+              decoration: BoxDecoration(
+                color: Colors.white, // Warna latar belakang
+                borderRadius: BorderRadius.circular(8), // Mengatur sudut bulat
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26, // Warna bayangan
+                    blurRadius: 8, // Seberapa buram bayangan
+                    offset: Offset(0, 4), // Posisi bayangan
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16), // Padding di dalam container
+              child: SingleChildScrollView( // Menambahkan SingleChildScrollView
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, // Mengatur avatar di sebelah kanan
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(40),
+                        image: DecorationImage(
+                          image: (detailKpiData?.profil ?? '').isNotEmpty &&
+                            Uri.tryParse(detailKpiData?.profil ?? '')?.hasAbsolutePath == true
+                        ? NetworkImage(detailKpiData!.profil) // Gunakan ! karena sudah dicek null-nya
+                        : const AssetImage('assets/images/profile.jpeg') as ImageProvider,
+                        fit: BoxFit.cover
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20), // Jarak antara teks dan avatar
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children:  [
+                          Text(
+                            '${detailKpiData?.nama ?? ''}',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '${detailKpiData?.jabatan_pegawai}',
+                            style: TextStyle(color: Color(0xFF007BFF)), // Mengubah warna teks menjadi biru
+                          ),
+                          Text('NIP: ${detailKpiData?.nip}'),
+                          // Text('Usia: ${detailKpiData?.usia} Tahun'),
+                          Text('Kantor: ${detailKpiData?.kantor_cabang_pegawai}'),
+                          SizedBox(height: 8),
+                          
+                        ],
+                      ),
+                    ),
+                    
+                  ],
+                ),
+              ),
+            ),
+            // _buildEmployeeInfo(),
             const SizedBox(height: 20),
             const Divider(thickness: 1, color: Colors.grey), // Divider setelah grafik
             
@@ -327,111 +601,38 @@ Widget build(BuildContext context) {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Pertumbuhan Kinerja',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 200,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: LineChart(
-                      LineChartData(
-                        gridData: FlGridData(show: true),
-                        borderData: FlBorderData(
-                          show: true,
-                          border: const Border(
-                            left: BorderSide(color: Colors.black),
-                            bottom: BorderSide(color: Colors.black),
-                            right: BorderSide(color: Colors.black),
-                            top: BorderSide(color: Colors.transparent),
-                          ),
-                        ),
-                        titlesData: FlTitlesData(
-                          bottomTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 28,
-                            getTitles: (value) {
-                              switch (value.toInt()) {
-                                case 0:
-                                  return 'Jan';
-                                case 1:
-                                  return 'Feb';
-                                case 2:
-                                  return 'Mar';
-                                case 3:
-                                  return 'Apr';
-                                case 4:
-                                  return 'May';
-                                case 5:
-                                  return 'Jun';
-                                case 6:
-                                  return 'Jul';
-                                case 7:
-                                  return 'Aug';
-                                case 8:
-                                  return 'Sep';
-                                case 9:
-                                  return 'Oct';
-                                case 10:
-                                  return 'Nov';
-                                case 11:
-                                  return 'Dec';
-                                default:
-                                  return '';
-                              }
-                            },
-                          ),
-                          leftTitles: SideTitles(
-                            showTitles: true,
-                            getTitles: (value) {
-                              if (value % 20 == 0) {
-                                return value.toInt().toString(); // Only show 0, 20, 40, 60, 80, 100
-                              }
-                              return '';
-                            },
-                            reservedSize: 15,
-                          ),
-                        ),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: [
-                              FlSpot(0, 0),
-                              FlSpot(1, 20),
-                              FlSpot(2, 50),
-                              FlSpot(3, 10),
-                              FlSpot(4, 30),
-                              FlSpot(5, 60),
-                              FlSpot(6, 20),
-                              FlSpot(7, 40),
-                              FlSpot(8, 80),
-                              FlSpot(9, 80),
-                              FlSpot(10, 100),
-                              FlSpot(11, 90),
-                            ],
-                            isCurved: true,
-                            colors: [Colors.orange],
-                            barWidth: 3,
-                          ),
-                        ],
+                Card(
+                  color: Colors.white,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                    Padding(
+                      padding: EdgeInsets.all(10),
+                      child: const Text(
+                        'Pertumbuhan Kinerja',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19),
                       ),
                     ),
-                  ),
+                    Pertumbuhankinerja(pegawaiId: widget.pegawaiId)
+                    ]),
                 ),
+               
+                const SizedBox(height: 12),
+                
               ],
             ),
+            Widgetkpi(pegawaiId: widget.pegawaiId),
 
-            _buildKPIIndicators(), // Call to KPI indicators
+            // _buildKPIIndicators(), // Call to KPI indicators
             const SizedBox(height: 20),
-            const Divider(thickness: 1, color: Colors.grey), // Divider setelah grafik
-            _buildKPIRatios(),
-            const Divider(thickness: 1, color: Colors.grey), // Divider setelah rasio
+            // const Divider(thickness: 1, color: Colors.grey), // Divider setelah grafik
+            // _buildKPIRatios(),
+            // const Divider(thickness: 1, color: Colors.grey), // Divider setelah rasio
             const SizedBox(height: 20),
-            _buildLastKPIValue(),
+            // _buildLastKPIValue(),
             const SizedBox(height: 20),
-            _buildOpinionSection(),
-            _buildSubmitButton(),
+            // _buildOpinionSection(),
+            // _buildSubmitButton(),
           ],
         ),
       ),
@@ -439,81 +640,82 @@ Widget build(BuildContext context) {
   );
 }
 
-  Widget _buildEmployeeInfo() {
-  return Container(
-    width: double.infinity, // Membuat container memenuhi lebar yang tersedia
-    height: 180, // Mengatur tinggi container
-    decoration: BoxDecoration(
-      color: Colors.white, // Warna latar belakang
-      borderRadius: BorderRadius.circular(8), // Mengatur sudut bulat
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black26, // Warna bayangan
-          blurRadius: 8, // Seberapa buram bayangan
-          offset: Offset(0, 4), // Posisi bayangan
-        ),
-      ],
-    ),
-    padding: const EdgeInsets.all(16), // Padding di dalam container
-    child: SingleChildScrollView( // Menambahkan SingleChildScrollView
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Mengatur avatar di sebelah kanan
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Mawar Eva de Jongh',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Frontend',
-                  style: TextStyle(color: Color(0xFF007BFF)), // Mengubah warna teks menjadi biru
-                ),
-                Text('NIP: 2388787656s657897'),
-                Text('Usia: 25 Tahun'),
-                Text('Kantor: Kantor Pusat'),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(
-                      'INDEX RATA-RATA KPI 4.0',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue, // Set text color to blue
-                      ),
-                    ),
-                    SizedBox(width: 3), // Mengurangi jarak untuk menghindari overflow
-                    Flexible( // Menambahkan Flexible di sini
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Icon(Icons.star, color: Colors.amber, size: 13), // Mengatur ukuran ikon
-                          Icon(Icons.star, color: Colors.amber, size: 13), // Mengatur ukuran ikon
-                          Icon(Icons.star, color: Colors.amber, size: 13), // Mengatur ukuran ikon
-                          Icon(Icons.star, color: Colors.amber, size: 13), // Mengatur ukuran ikon
-                          Icon(Icons.star_border, color: Colors.amber, size: 14), // Mengatur ukuran ikon
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14), // Jarak antara teks dan avatar
-          CircleAvatar(
-            radius: 35,
-            backgroundImage: AssetImage('assets/images/profile.jpeg'),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+//   Widget _buildEmployeeInfo() {
+//     final IndividuData individuData;
+//   return Container(
+//     width: double.infinity, // Membuat container memenuhi lebar yang tersedia
+//     height: 180, // Mengatur tinggi container
+//     decoration: BoxDecoration(
+//       color: Colors.white, // Warna latar belakang
+//       borderRadius: BorderRadius.circular(8), // Mengatur sudut bulat
+//       boxShadow: [
+//         BoxShadow(
+//           color: Colors.black26, // Warna bayangan
+//           blurRadius: 8, // Seberapa buram bayangan
+//           offset: Offset(0, 4), // Posisi bayangan
+//         ),
+//       ],
+//     ),
+//     padding: const EdgeInsets.all(16), // Padding di dalam container
+//     child: SingleChildScrollView( // Menambahkan SingleChildScrollView
+//       child: Row(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         mainAxisAlignment: MainAxisAlignment.spaceBetween, // Mengatur avatar di sebelah kanan
+//         children: [
+//           Expanded(
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: const [
+//                 Text(
+//                   '${individuData.nama_pegawai}',
+//                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+//                 ),
+//                 Text(
+//                   'Frontend',
+//                   style: TextStyle(color: Color(0xFF007BFF)), // Mengubah warna teks menjadi biru
+//                 ),
+//                 Text('NIP: 2388787656s657897'),
+//                 Text('Usia: 25 Tahun'),
+//                 Text('Kantor: Kantor Pusat'),
+//                 SizedBox(height: 8),
+//                 Row(
+//                   children: [
+//                     Text(
+//                       'INDEX RATA-RATA KPI 4.0',
+//                       style: TextStyle(
+//                         fontSize: 14,
+//                         fontWeight: FontWeight.bold,
+//                         color: Colors.blue, // Set text color to blue
+//                       ),
+//                     ),
+//                     SizedBox(width: 3), // Mengurangi jarak untuk menghindari overflow
+//                     Flexible( // Menambahkan Flexible di sini
+//                       child: Row(
+//                         mainAxisAlignment: MainAxisAlignment.start,
+//                         children: [
+//                           Icon(Icons.star, color: Colors.amber, size: 13), // Mengatur ukuran ikon
+//                           Icon(Icons.star, color: Colors.amber, size: 13), // Mengatur ukuran ikon
+//                           Icon(Icons.star, color: Colors.amber, size: 13), // Mengatur ukuran ikon
+//                           Icon(Icons.star, color: Colors.amber, size: 13), // Mengatur ukuran ikon
+//                           Icon(Icons.star_border, color: Colors.amber, size: 14), // Mengatur ukuran ikon
+//                         ],
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ],
+//             ),
+//           ),
+//           const SizedBox(width: 14), // Jarak antara teks dan avatar
+//           CircleAvatar(
+//             radius: 35,
+//             backgroundImage: AssetImage('assets/images/profile.jpeg'),
+//           ),
+//         ],
+//       ),
+//     ),
+//   );
+// }
 
   Widget _buildKPIIndicators() {
   return SingleChildScrollView(

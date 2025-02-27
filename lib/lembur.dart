@@ -1,293 +1,261 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:kpi/api/api.dart';
 
-void main() {
-  runApp(LemburApp());
+class LemburPage extends StatefulWidget {
+  const LemburPage({required this.prevPage, super.key});
+  final String prevPage;
+
+  @override
+  _LemburPageState createState() => _LemburPageState();
 }
 
-class LemburApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Lembur1(),
+class LemburData {
+  final String pegawai_id;
+  final String nama;
+  final String jabatan;
+  final String profil;
+  final String usia;
+  final String nip;
+  final String cabang;
+
+  LemburData({
+    required this.pegawai_id,
+    required this.nama,
+    required this.jabatan,
+    required this.profil,
+    required this.usia,
+    required this.nip,
+    required this.cabang,
+  });
+
+  factory LemburData.fromJson(Map<String, dynamic> json) {
+    return LemburData(
+      pegawai_id: json['pegawai_id'] ?? '',
+      nama: json['nama'] ?? '',
+      jabatan: json['jabatan'] ?? '',
+      profil: json['profil'] ?? '',
+      usia: json['usia'] != null ? json['usia'].toString() : '0',
+      nip: json['nip'] != null ? json['nip'].toString() : '',
+      cabang: json['cabang'] ?? '',
     );
   }
 }
 
-class Lembur1 extends StatefulWidget {
+class _LemburPageState extends State<LemburPage> {
+  List<LemburData> lemburDataList = [];
+  bool isLoading = true;
+  String search = "";
+  Timer? _debounce;
+
   @override
-  _Lembur1State createState() => _Lembur1State();
-}
+  void initState() {
+    super.initState();
+    fetchLemburData();
+  }
 
-class _Lembur1State extends State<Lembur1> {
-  String searchQuery = "";
-  String selectedJobType = 'Posisi'; // Updated default to match jobTypes
-  String selectedBranch = 'Cabang'; // Updated default to match branches
 
-  final List<String> branches = [
-    'Cabang',
-    'Kantor Pusat',
-    'Kantor Pusat Kreatif',
-    'Kantor Cabang A',
-    'Kantor Cabang B'
-  ];
+  Future<void> fetchLemburData({String? query}) async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
 
-  final List<String> jobTypes = [
-    'Posisi',
-    'Front end Development',
-    'Back end Development',
-    'UI/UX Designer'
-  ];
+      var url = '/lemburreport';
+      if (query != null && query.isNotEmpty) {
+        url += '?search=$query';
+      }
+      var dat = await ApiHandler().getData(url);
+      debugPrint('API Response Status Code: ${dat.statusCode}');
+      debugPrint('API Response Body: ${dat.body}');
 
-  final List<Map<String, String>> lemburData = [
-    {
-      'name': 'Mawar',
-      'position': 'Front end Development',
-      'nip': '0988767656s657897',
-      'office': 'Kantor Pusat',
-      'rating': '4.0'
-    },
-    {
-      'name': 'John',
-      'position': 'Back end Development',
-      'nip': '9876543210123456',
-      'office': 'Kantor Pusat',
-      'rating': '4.5'
-    },
-    {
-      'name': 'Jane Smith',
-      'position': 'UI/UX Designer',
-      'nip': '1122334455667788',
-      'office': 'Kantor Pusat Kreatif',
-      'rating': '4.2'
-    },
-    {
-      'name': 'Tom Hanks',
-      'position': 'Back end Development',
-      'nip': '4567891234567890',
-      'office': 'Kantor Cabang A',
-      'rating': '3.9'
-    },
-    {
-      'name': 'Sarah Connor',
-      'position': 'Front end Development',
-      'nip': '6543217890123456',
-      'office': 'Kantor Cabang B',
-      'rating': '4.7'
-    },
-  ];
+      if (dat.statusCode == 200 && dat.body != null) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
+          final List<dynamic> data = jsonResponse['data'];
+          List<LemburData> tempList =
+              data.map((item) => LemburData.fromJson(item)).toList();
 
-  List<Map<String, String>> get filteredLemburData {
-    return lemburData.where((item) {
-      final branchMatches =
-          selectedBranch == 'Cabang' || item['office'] == selectedBranch;
-      final jobTypeMatches =
-          selectedJobType == 'Posisi' || item['position'] == selectedJobType;
-      return jobTypeMatches &&
-          branchMatches &&
-          item['name']!.toLowerCase().contains(searchQuery.toLowerCase());
-    }).toList();
+          setState(() {
+            lemburDataList = tempList;
+            isLoading = false;
+          });
+        } else {
+          throw Exception('Invalid data format');
+        }
+      } else {
+        throw Exception('Failed to fetch data. Status code: ${dat.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      Fluttertoast.showToast(msg: 'Error: $e');
+    }
+  }
+  void _onSearchChanged(String value) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      fetchLemburData(query: value);
+    });
+
+    setState(() {
+      search = value;
+    });
+  }
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Lembur'),
-        backgroundColor: Color(0xFF007BFF),
-        iconTheme: IconThemeData(
-          color: Colors.white,
-        ),
-        titleTextStyle: TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-        ),
+        title: const Text('Lembur'),
+        backgroundColor: const Color(0xFF007BFF),
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(Icons.search, color: Colors.white,),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: LemburSearchDelegate(
-                  lemburData: lemburData,
-                  filterOffice: selectedBranch,
-                  filterCategory: selectedJobType,
-                  showFilterDialog: () {},
-                ),
-              );
-            },
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.search, color: Colors.white),
+          //   onPressed: () {
+          //     // Implement search functionality here if needed
+          //   },
+          // ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Cabang:', style: TextStyle(fontSize: 14)),
-                        DropdownButton<String>(
-                          isExpanded: true,
-                          value: selectedBranch,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedBranch = newValue!;
-                            });
-                          },
-                          items: branches
-                              .map<DropdownMenuItem<String>>((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value, style: const TextStyle(fontSize: 14)),
-                            );
-                          }).toList(),
-                        ),
-                      ],
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                // Add your dropdowns here if needed
+              ],
+            ),
+            SizedBox(height: 20,),
+            Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextField(
+                  onChanged: _onSearchChanged, // Panggil otomatis saat mengetik
+                  decoration: InputDecoration(
+                    labelText: "Search berdasarkan nama",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15.0),
                     ),
+                    suffixIcon: Icon(Icons.search),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Posisi:', style: TextStyle(fontSize: 14)),
-                        DropdownButton<String>(
-                          isExpanded: true,
-                          value: selectedJobType,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedJobType = newValue!;
-                            });
-                          },
-                          items: jobTypes
-                              .map<DropdownMenuItem<String>>((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value, style: const TextStyle(fontSize: 14)),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
-              SizedBox(height: 16),
+            const SizedBox(height: 16),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : lemburDataList.isEmpty
+                      ? const Center(child: Text('No data found.'))
+                      : ListView.builder(
+                          itemCount: lemburDataList.length,
+                          itemBuilder: (context, index) {
+                            final lembur = lemburDataList[index];
+                            return LemburCard(lembur: lembur);
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-              // Daftar karyawan yang sudah difilter
-              Column(
-                children: (filteredLemburData.isNotEmpty)
-                    ? List.generate(
-                        filteredLemburData.length,
-                        (index) {
-                          final item = filteredLemburData[index];
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => LemburDetailScreen(
-                                    name: item['name']!,
-                                    position: item['position']!,
-                                    nip: item['nip']!,
-                                    office: item['office']!,
-                                    rating: item['rating']!,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8.0, vertical: 4.0),
-                              child: Card(
-                                elevation: 4.0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius:
-                                            BorderRadius.circular(8.0),
-                                        child: Image.asset(
-                                          'assets/images/profile.jpeg', // Ensure this image exists
-                                          width: 60,
-                                          height: 60,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                      SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              item['name']!,
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            Text(
-                                              item['position']!,
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Color(0xFF007BFF),
-                                              ),
-                                            ),
-                                            SizedBox(height: 4),
-                                            Text('NIP: ${item['nip'] }',
-                                            style: TextStyle(fontSize: 14),),
-                                            Text('Kantor: ${item['office']}',
-                                            style: TextStyle(fontSize: 14),),
-                                            SizedBox(height: 8),
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Row(
-                                                  children: List.generate(
-                                                    5,
-                                                    (i) => Icon(
-                                                      i <
-                                                              double.parse(item[
-                                                                  'rating']!)
-                                                          ? Icons.star
-                                                          : Icons.star_border,
-                                                      size: 16,
-                                                      color: Colors.amber,
-                                                    ),
-                                                  ),
-                                                ),
-                                                Text(
-                                                    'Rating: ${item['rating']}'),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+class LemburCard extends StatelessWidget {
+  final LemburData lembur;
+
+  const LemburCard({Key? key, required this.lembur}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Get.to(()=> LemburDetailScreen(lemburData:lembur));
+                },
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(30),
+                        image: DecorationImage(
+                          image: lembur.profil.isNotEmpty &&
+                                  Uri.tryParse(lembur.profil)?.hasAbsolutePath ==
+                                      true
+                              ? NetworkImage(lembur.profil)
+                              : const AssetImage('assets/images/default.jpg')
+                                  as ImageProvider,
+                                  fit: BoxFit.cover
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            lembur.nama,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.black,
                             ),
-                          );
-                        },
-                      )
-                    : [
-                        Text('Tidak ada karyawan yang sesuai.')
-                      ], // Pesan jika tidak ada karyawan
+                          ),
+                          Text(
+                            lembur.jabatan,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'NIP: ${lembur.nip}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Kantor: ${lembur.cabang}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 5),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -296,30 +264,82 @@ class _Lembur1State extends State<Lembur1> {
     );
   }
 }
+class DetailLemburData {
+  final String bulan;
+  final int jumlah;
+  
 
-class LemburDetailScreen extends StatelessWidget {
-  final String name;
-  final String position;
-  final String nip;
-  final String office;
-  final String rating;
+  DetailLemburData({
+    required this.bulan,
+    required this.jumlah,
+   
+  });
 
-  final List<Map<String, String>> lemburDetails = [
-    {"month": "April 2024", "count": "2 kali lembur"},
-    {"month": "Mei 2024", "count": "5 kali lembur"},
-    {"month": "Juli 2024", "count": "1 kali lembur"},
-    {"month": "Agustus 2024", "count": "3 kali lembur"},
-  ];
+  factory DetailLemburData.fromJson(Map<String, dynamic> json) {
+    return DetailLemburData(
+      bulan: json['bulan'],
+      jumlah: json['jumlah'],
+    );
+  }
+}
+class LemburDetailScreen extends StatefulWidget {
+  final LemburData lemburData;
+  const LemburDetailScreen({required this.lemburData, Key? key}) : super(key: key);
 
-  LemburDetailScreen({
-    Key? key,
-    required this.name,
-    required this.position,
-    required this.nip,
-    required this.office,
-    required this.rating,
-  }) : super(key: key);
+  @override
+  State<LemburDetailScreen> createState() => _LemburDetailScreenState();
+}
 
+class _LemburDetailScreenState extends State<LemburDetailScreen> {
+  // Future<void> fetchLemburDetail() async {
+  List<DetailLemburData> lemburDetails = [];
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchLemburDetail();
+  }
+
+  Future<void> fetchLemburDetail() async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
+      
+      var url = '/detaillemburreport/${widget.lemburData.pegawai_id}';
+      var dat = await ApiHandler().getData(url);
+      
+      if (dat.statusCode == 200 && dat.body != null) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
+          final List<dynamic> data = jsonResponse['data'];
+          setState(() {
+            lemburDetails = data.map((item) => DetailLemburData.fromJson(item)).toList();
+            isLoading = false;
+          });
+        } else {
+          throw Exception('Invalid data format');
+        }
+      } else {
+        throw Exception('Failed to fetch data. Status code: ${dat.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      Fluttertoast.showToast(msg: 'Error: $e');
+    }
+  }
+
+  String formatBulan(String bulanTahun) {
+    try {
+      DateTime date = DateFormat("yyyy-MM").parse(bulanTahun);
+      return DateFormat("MMMM yyyy", "id_ID").format(date); // Format ke "Juli 2024"
+    } catch (e) {
+      return bulanTahun; // Jika error, tetap pakai format awal
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -340,21 +360,33 @@ class LemburDetailScreen extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
-                  radius: 40,
-                  backgroundImage: AssetImage('assets/images/profile.jpeg'),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent,
+                    borderRadius: BorderRadius.circular(40),
+                    image: DecorationImage(
+                      image: widget.lemburData.profil.isNotEmpty
+                          ? (widget.lemburData.profil.startsWith('http')
+                              ? NetworkImage(widget.lemburData.profil) // URL gambar
+                              : AssetImage(widget.lemburData.profil) as ImageProvider) // Path lokal
+                          : const AssetImage('assets/images/profile.jpeg'), // Gambar default
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children:[
                     Text(
-                      'Mawar Eva de Jongh',
+                      '${widget.lemburData.nama}',
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Front end Development',
+                      '${widget.lemburData.jabatan}',
                       style: TextStyle(
                         fontSize: 14,
                         color: Color(0xFF007BFF),
@@ -362,40 +394,40 @@ class LemburDetailScreen extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'NIP: 0988767656s657897',
+                      'NIP: ${widget.lemburData.nip}',
                       style: TextStyle(fontSize: 14), // Menambahkan fontSize 14
                     ),
                     Text(
-                      'Usia: 25 Tahun',
+                      'Usia: ${widget.lemburData.usia} Tahun',
                       style: TextStyle(fontSize: 14), // Menambahkan fontSize 14
                     ),
                     Text(
-                      'Kantor: Kantor Pusat',
+                      'Kantor: ${widget.lemburData.cabang}',
                     style: TextStyle(fontSize: 14), // Menambahkan fontSize 14
                     ),
                     SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          'INDEX RATA-RATA KPI 4.0',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF007BFF),
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Row(
-                          children: [
-                            Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
-                            Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
-                            Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
-                            Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
-                            Icon(Icons.star_border, color: Colors.amber, size: 15),  // Changed to golds.star,
-                          ],
-                        ),
-                      ],
-                    ),
+                    // Row(
+                    //   children: [
+                    //     Text(
+                    //       'INDEX RATA-RATA KPI 4.0',
+                    //       style: TextStyle(
+                    //         fontSize: 14,
+                    //         fontWeight: FontWeight.bold,
+                    //         color: Color(0xFF007BFF),
+                    //       ),
+                    //     ),
+                    //     SizedBox(width: 8),
+                    //     Row(
+                    //       children: [
+                    //         Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
+                    //         Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
+                    //         Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
+                    //         Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
+                    //         Icon(Icons.star_border, color: Colors.amber, size: 15),  // Changed to golds.star,
+                    //       ],
+                    //     ),
+                    //   ],
+                    // ),
                   ],
                 ),
               ],
@@ -411,59 +443,49 @@ class LemburDetailScreen extends StatelessWidget {
             ),
             SizedBox(height: 10),
             Expanded(
-              child: ListView.builder(
-                itemCount: lemburDetails.length,
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () {
-                      // Navigating to the detail page for the selected month
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LemburDetailMonthScreen(
-                            month: lemburDetails[index]["month"]!,
-                            name: name,
-                            position: position,
-                            nip: nip,
-                            office: office,
-                            rating: rating,
-                          ),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8.0),
-                          border: Border.all(color: Colors.blue.shade300),
-                        ),
-                        padding: const EdgeInsets.all(12.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              lemburDetails[index]["month"]!,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+              child: isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : lemburDetails.isEmpty
+                      ? Center(child: Text("Tidak ada data."))
+                      : ListView.builder(
+                          itemCount: lemburDetails.length,
+                          itemBuilder: (context, index) {
+                            final detail = lemburDetails[index];
+                            return Card(
+                              color: Colors.blue[50],
+                              margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16), // Jarak antar card
+                              elevation: 3, // Efek shadow
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                            ),
-                            Text(
-                              lemburDetails[index]["count"]!,
-                              style: TextStyle(
-                                fontSize: 14,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      formatBulan(detail.bulan),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      "${detail.jumlah} kali lembur",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        // color: Colors.blueAccent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
             ),
+
           ],
         ),
       ),

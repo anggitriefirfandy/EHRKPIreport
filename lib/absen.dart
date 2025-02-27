@@ -1,57 +1,119 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
+import 'package:kpi/api/api.dart';
 
+class AbsensiPage extends StatefulWidget {
+  const AbsensiPage({required this.prevPage, super.key});
+  final String prevPage;
 
-class Absen extends StatefulWidget {
   @override
-  _AbsenState createState() => _AbsenState();
+  _AbsensiPageState createState() => _AbsensiPageState();
 }
 
-class _AbsenState extends State<Absen> {
-  String selectedBranch = 'Cabang'; // Filter default untuk kantor cabang
-  final List<String> branches = [
-    'Cabang',
-    'Kantor Pusat',
-    'Cabang Jakarta',
-    'Cabang Bandung',
-    'Cabang Surabaya',
-    'Cabang Yogyakarta',
-    'Cabang Bali'
-  ];
+class AbsensiData {
+  final String pegawai_id;
+  final String nama;
+  final String jabatan;
+  final String profil;
+  final String usia;
+  final String nip;
+  final String cabang;
 
-  String selectedJobType = 'Posisi'; // Filter default
-  final List<String> jobTypes = [
-    'Posisi',
-    'Front end Development',
-    'Back end Development',
-    'Full Stack',
-    'UI/UX Designer'
-  ];
+  AbsensiData({
+    required this.pegawai_id,
+    required this.nama,
+    required this.jabatan,
+    required this.profil,
+    required this.usia,
+    required this.nip,
+    required this.cabang,
+  });
 
-  bool showAllEmployees = false; // Variable to control "Lihat Selengkapnya"
+  factory AbsensiData.fromJson(Map<String, dynamic> json) {
+    return AbsensiData(
+      pegawai_id: json['pegawai_id'] ?? '',
+      nama: json['nama'] ?? '',
+      jabatan: json['jabatan'] ?? '',
+      profil: json['profil'] ?? '',
+      usia: json['usia'] != null ? json['usia'].toString() : '0',
+      nip: json['nip'] != null ? json['nip'].toString() : '',
+      cabang: json['cabang'] ?? '',
+    );
+  }
+}
 
-  // Daftar karyawan
-  final List<Employee> employees = [
-    Employee('Mawar Eva de jongh', 'Front end Development', 'Cabang Jakarta'),
-    Employee('Budi Santoso', 'Back end Development', 'Cabang Bandung'),
-    Employee('Siti Aminah', 'UI/UX Designer', 'Cabang Surabaya'),
-    Employee('John Doe', 'Full Stack', 'Kantor Pusat'),
-    Employee('Jane Smith', 'Front end Development', 'Cabang Yogyakarta'),
-    Employee('Dewi Rahayu', 'UI/UX Designer', 'Cabang Bali'),
-  ];
-
-  List<Employee> get filteredEmployees {
-    // Filter berdasarkan job type dan kantor cabang
-    return employees.where((employee) {
-      final branchMatches =
-          selectedBranch == 'Cabang' || employee.branch == selectedBranch;
-      final jobTypeMatches =
-          selectedJobType == 'Posisi' || employee.jobType == selectedJobType;
-      return jobTypeMatches && branchMatches;
-    }).toList();
+class _AbsensiPageState extends State<AbsensiPage> {
+  List<AbsensiData> absensiDataList = []; // Variabel untuk menyimpan data
+  bool isLoading = true;
+  String search = "";
+  Timer? _debounce;
+  @override
+  void initState() {
+    super.initState();
+    fetchAbsensiData(); // Panggil fungsi untuk mengambil data saat inisialisasi
   }
 
+  Future<void> fetchAbsensiData({String? query}) async {
+    try {
+      setState(() {
+        isLoading = true; // Set loading true saat mulai mengambil data
+      });
+
+      var url = '/absensireport';
+      if (query != null && query.isNotEmpty) {
+        url += '?search=$query';
+      }
+      var dat = await ApiHandler().getData(url);
+      debugPrint('API Response Status Code: ${dat.statusCode}');
+      debugPrint('API Response Body: ${dat.body}');
+      if (dat.statusCode == 200 && dat.body != null) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+        
+        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
+          final List<dynamic> data = jsonResponse['data'];
+          List<AbsensiData> tempList = 
+              data.map((item) => AbsensiData.fromJson(item)).toList();
+
+          setState(() {
+            absensiDataList = tempList; // Simpan data ke variabel
+            isLoading = false; // Set loading false setelah data didapat
+          });
+        } else {
+          throw Exception('Invalid data format');
+        }
+      } else {
+        throw Exception('Failed to fetch data. Status code: ${dat.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false; // Set loading false jika ada error
+      });
+      Fluttertoast.showToast(msg: 'Error: $e');
+    }
+  }
+  void _onSearchChanged(String value) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      fetchAbsensiData(query: value);
+    });
+
+    setState(() {
+      search = value;
+    });
+  }
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,32 +122,21 @@ class _AbsenState extends State<Absen> {
         title: Text(
           'Absen',
           style: TextStyle(
-            color: Colors.white, // Set text color to white
-            fontSize: 20, // Set font size to 20
+            color: Colors.white,
+            fontSize: 20,
           ),
         ),
         backgroundColor: Color(0xFF007BFF),
         centerTitle: true,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.search,
-              color: Colors.white, // Set icon color to white
-            ),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: AttendanceSearchDelegate(employees),
-              );
-            },
-          ),
+          // IconButton(
+          //   icon: Icon(Icons.search, color: Colors.white),
+          //   onPressed: () {},
+          // ),
         ],
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: Colors.white, // Set back icon color to white
-          ),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
             Navigator.pop(context);
           },
@@ -97,138 +148,70 @@ class _AbsenState extends State<Absen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Dropdown filter untuk tipe pekerjaan dan kantor cabang dalam satu baris
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Cabang:', style: TextStyle(fontSize: 14)),
-                        DropdownButton<String>(
-                          isExpanded: true,
-                          value: selectedBranch,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedBranch = newValue!;
-                            });
-                          },
-                          items: branches
-                              .map<DropdownMenuItem<String>>((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child:
-                                  Text(value, style: const TextStyle(fontSize: 14)),
-                            );
-                          }).toList(),
-                        ),
-                      ],
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextField(
+                  onChanged: _onSearchChanged, // Panggil otomatis saat mengetik
+                  decoration: InputDecoration(
+                    labelText: "Search berdasarkan nama",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15.0),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Posisi:', style: TextStyle(fontSize: 14)),
-                        DropdownButton<String>(
-                          isExpanded: true,
-                          value: selectedJobType,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedJobType = newValue!;
-                            });
-                          },
-                          items: jobTypes
-                              .map<DropdownMenuItem<String>>((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child:
-                                  Text(value, style: const TextStyle(fontSize: 14)),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 16),
-
-              // Daftar profil karyawan berdasarkan filter (tampilkan 3 atau semua)
-              Column(
-                children: (filteredEmployees.isNotEmpty)
-                    ? List.generate(
-                        showAllEmployees
-                            ? filteredEmployees.length
-                            : filteredEmployees.length.clamp(0, 3), // Prevent RangeError
-                        (index) =>
-                            EmployeeCard(employee: filteredEmployees[index]),
-                      )
-                    : [
-                        Text('Tidak ada karyawan yang sesuai.')
-                      ], // Tampilkan pesan jika tidak ada karyawan
-              ),
-
-              // Tombol "Lihat Selengkapnya"
-              if (filteredEmployees.length > 3 && !showAllEmployees)
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      setState(() {
-                        showAllEmployees = true;
-                      });
-                    },
-                    child: Text('Lihat Selengkapnya',
-                        style: TextStyle(color: Color(0xFF007BFF))),
+                    suffixIcon: Icon(Icons.search),
                   ),
                 ),
-
-              // Attendance Section (Scrollable Area)
+              ),
+              SizedBox(height: 16),
+              SizedBox(
+                height: 700,
+                child: isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : absensiDataList.isEmpty
+                        ? Center(child: Text('No data found.'))
+                        : ListView.builder(
+                            itemCount: absensiDataList.length,
+                            itemBuilder: (context, index) {
+                              final absensi = absensiDataList[index];
+                              return AbsensiCard(absensi: absensi);
+                            },
+                          ),
+              ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: 10), // Space at the top
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0), // Add padding for better alignment
-                    child: Text(
-                      'Presentase Absensi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black, // Ensure contrast with background
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                      height:
-                          50), // Increased space between the text and the chart
-                  SizedBox(
-                    height: 200,
-                    child: AttendanceChart(),
-                  ),
-                  SizedBox(
-                      height:
-                          16), // Increased space between the chart and the legend
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        LegendIndicator(color: Colors.green, text: 'Hadir'),
-                        SizedBox(width: 16),
-                        LegendIndicator(
-                            color: Colors.yellow, text: 'Terlambat'),
-                        SizedBox(width: 16),
-                        LegendIndicator(color: Colors.red, text: 'Tidak Hadir'),
-                      ],
-                    ),
-                  ),
+                  SizedBox(height: 10),
+                  // Padding(
+                  //   padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  //   child: Text(
+                  //     'Presentase Absensi',
+                  //     style: TextStyle(
+                  //       fontSize: 14,
+                  //       fontWeight: FontWeight.bold,
+                  //       color: Colors.black,
+                  //     ),
+                  //   ),
+                  // ),
+                  SizedBox(height: 50),
+                  // SizedBox(
+                  //   height: 200,
+                  //   child: AttendanceChart(),
+                  // ),
+                  // SizedBox(height: 16),
+                  // Padding(
+                  //   padding: const EdgeInsets.all(8.0),
+                  //   child: Row(
+                  //     mainAxisAlignment: MainAxisAlignment.center,
+                  //     children: [
+                  //       LegendIndicator(color: Colors.green, text: 'Hadir'),
+                  //       SizedBox(width: 16),
+                  //       LegendIndicator(color: Colors.yellow, text: 'Terlambat'),
+                  //       SizedBox(width: 16),
+                  //       LegendIndicator(color: Colors.red, text: 'Tidak Hadir'),
+                  //     ],
+                  //   ),
+                  // ),
                 ],
               ),
-
-              Group56(),
             ],
           ),
         ),
@@ -237,114 +220,95 @@ class _AbsenState extends State<Absen> {
   }
 }
 
-class Employee {
-  final String name;
-  final String jobType;
-  final String branch;
+class AbsensiCard extends StatelessWidget {
+  final AbsensiData absensi;
 
-  Employee(this.name, this.jobType, this.branch);
-}
-
-class EmployeeCard extends StatelessWidget {
-  final Employee employee;
-
-  const EmployeeCard({required this.employee});
+  const AbsensiCard({Key? key, required this.absensi}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        // Navigate to the EmployeeDetailPage with the selected employee
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EmployeeDetailPage(employee: employee),
-          ),
-        );
-      },
-      child: Container(
-        padding: EdgeInsets.all(16),
-        margin: EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 5,
-              spreadRadius: 2,
-            ),
-          ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/images/profile.jpeg'),
-                  fit: BoxFit.cover,
-                ),
-                borderRadius: BorderRadius.circular(5), // Membuat kotak
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    employee.name,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  // Get.to(()=> AbsensiDetailPage(absensiData:absensi));
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AbsensiDetailPage(pegawaiId: absensi.pegawai_id),
                     ),
-                  ),
-                  Text(
-                    employee.jobType,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF007BFF),
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    "NIP: 0988767656s657897",
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  Text(
-                    "Kantor: Kantor Pusat Operasional",
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  SizedBox(height: 4), // Add spacing between lines
-                  Row(
-                      mainAxisAlignment: MainAxisAlignment
-                          .spaceBetween, // Allocate space between the row elements
-                      children: [
-                        Row(
-                          children: [
-                            RatingBarIndicator(
-                              rating: 4.0,
-                              itemBuilder: (context, index) => Icon(
-                                Icons.star,
-                                color: Colors.amber,
-                              ),
-                              itemCount: 5,
-                              itemSize: 18.0,
-                            ),
-                            SizedBox(
-                                width:
-                                    12), // Increased spacing between stars and rating text
-                          ],
+                  );
+                },
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(30),
+                        image: DecorationImage(
+                          image: absensi.profil.isNotEmpty &&
+                                  Uri.tryParse(absensi.profil)?.hasAbsolutePath ==
+                                      true
+                              ? NetworkImage(absensi.profil)
+                              : AssetImage('assets/images/defaultimg.jpg')
+                                  as ImageProvider,
+                                  fit: BoxFit.cover
                         ),
-                        Text("Rating: 4.0"),
-                      ]),
-                ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            absensi.nama,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.black,
+                            ),
+                          ),
+                          Text(
+                            absensi.jabatan,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'NIP: ${absensi.nip}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Kantor: ${absensi.cabang}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 5),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -352,9 +316,9 @@ class EmployeeCard extends StatelessWidget {
 }
 
 class AttendanceSearchDelegate extends SearchDelegate<String> {
-  final List<Employee> employees;
+  final List<AbsensiData> absensi;
 
-  AttendanceSearchDelegate(this.employees);
+  AttendanceSearchDelegate(this.absensi);
 
   @override
   List<Widget> buildActions(BuildContext context) {
@@ -380,18 +344,18 @@ class AttendanceSearchDelegate extends SearchDelegate<String> {
 
   @override
   Widget buildResults(BuildContext context) {
-    final results = employees
-        .where((employee) =>
-            employee.name.toLowerCase().contains(query.toLowerCase()))
+    final results = absensi
+        .where((absensi) =>
+            absensi.nama.toLowerCase().contains(query.toLowerCase()))
         .toList();
 
     return ListView.builder(
       itemCount: results.length,
       itemBuilder: (context, index) {
         return ListTile(
-          title: Text(results[index].name),
+          title: Text(results[index].nama),
           onTap: () {
-            close(context, results[index].name);
+            close(context, results[index].nama);
           },
         );
       },
@@ -400,18 +364,18 @@ class AttendanceSearchDelegate extends SearchDelegate<String> {
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    final suggestions = employees
-        .where((employee) =>
-            employee.name.toLowerCase().contains(query.toLowerCase()))
+    final suggestions = absensi
+        .where((absensi) =>
+            absensi.nama.toLowerCase().contains(query.toLowerCase()))
         .toList();
 
     return ListView.builder(
       itemCount: suggestions.length,
       itemBuilder: (context, index) {
         return ListTile(
-          title: Text(suggestions[index].name),
+          title: Text(suggestions[index].nama),
           onTap: () {
-            query = suggestions[index].name;
+            query = suggestions[index].nama;
             showResults(context);
           },
         );
@@ -421,83 +385,83 @@ class AttendanceSearchDelegate extends SearchDelegate<String> {
 }
 
 // Attendance Chart class
-class AttendanceChart extends StatelessWidget {
-  final List<AttendanceData> attendanceData = [
-    AttendanceData('Jan', 22, 5, 3),
-    AttendanceData('Feb', 23, 1, 2),
-    AttendanceData('Mar', 24, 1, 1),
-    AttendanceData('Apr', 21, 3, 4),
-    AttendanceData('Mei', 23, 4, 2),
-    AttendanceData('Juni', 21, 3, 4),
-    AttendanceData('Juli', 22, 1, 3),
-    AttendanceData('Agst', 25, 3, 0),
-    AttendanceData('Sept', 21, 3, 4),
-    AttendanceData('Okt', 24, 5, 1),
-    AttendanceData('Nov', 20, 3, 5),
-    AttendanceData('Des', 24, 1, 1),
-  ];
+// class AttendanceChart extends StatelessWidget {
+//   final List<AttendanceData> attendanceData = [
+//     AttendanceData('Jan', 22, 5, 3),
+//     AttendanceData('Feb', 23, 1, 2),
+//     AttendanceData('Mar', 24, 1, 1),
+//     AttendanceData('Apr', 21, 3, 4),
+//     AttendanceData('Mei', 23, 4, 2),
+//     AttendanceData('Juni', 21, 3, 4),
+//     AttendanceData('Juli', 22, 1, 3),
+//     AttendanceData('Agst', 25, 3, 0),
+//     AttendanceData('Sept', 21, 3, 4),
+//     AttendanceData('Okt', 24, 5, 1),
+//     AttendanceData('Nov', 20, 3, 5),
+//     AttendanceData('Des', 24, 1, 1),
+//   ];
 
-  @override
-  Widget build(BuildContext context) {
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: 25,
-        barTouchData: BarTouchData(enabled: false),
-        titlesData: FlTitlesData(
-          leftTitles: SideTitles(
-            showTitles: true,
-            getTextStyles: (value) => const TextStyle(
-              color: Colors.black,
-              fontSize: 12,
-            ),
-            margin: 6,
-          ),
-          bottomTitles: SideTitles(
-            showTitles: true,
-            getTextStyles: (value) => const TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-            getTitles: (double value) {
-              return attendanceData[value.toInt()].month;
-            },
-            margin: 8,
-          ),
-        ),
-        gridData: FlGridData(show: true),
-        borderData: FlBorderData(
-          show: false,
-        ),
-        barGroups: attendanceData
-            .asMap()
-            .entries
-            .map(
-              (entry) => BarChartGroupData(
-                x: entry.key,
-                barRods: [
-                  BarChartRodData(
-                    y: entry.value.attended.toDouble(),
-                    colors: [Colors.green],
-                  ),
-                  BarChartRodData(
-                    y: entry.value.late.toDouble(),
-                    colors: [Colors.yellow],
-                  ),
-                  BarChartRodData(
-                    y: entry.value.absent.toDouble(),
-                    colors: [Colors.red],
-                  ),
-                ],
-                showingTooltipIndicators: [0],
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return BarChart(
+//       BarChartData(
+//         alignment: BarChartAlignment.spaceAround,
+//         maxY: 25,
+//         barTouchData: BarTouchData(enabled: false),
+//         titlesData: FlTitlesData(
+//           leftTitles: SideTitles(
+//             showTitles: true,
+//             getTextStyles: (value) => const TextStyle(
+//               color: Colors.black,
+//               fontSize: 12,
+//             ),
+//             margin: 6,
+//           ),
+//           bottomTitles: SideTitles(
+//             showTitles: true,
+//             getTextStyles: (value) => const TextStyle(
+//               color: Colors.black,
+//               fontWeight: FontWeight.bold,
+//               fontSize: 12,
+//             ),
+//             getTitles: (double value) {
+//               return attendanceData[value.toInt()].month;
+//             },
+//             margin: 8,
+//           ),
+//         ),
+//         gridData: FlGridData(show: true),
+//         borderData: FlBorderData(
+//           show: false,
+//         ),
+//         barGroups: attendanceData
+//             .asMap()
+//             .entries
+//             .map(
+//               (entry) => BarChartGroupData(
+//                 x: entry.key,
+//                 barRods: [
+//                   BarChartRodData(
+//                     y: entry.value.attended.toDouble(),
+//                     colors: [Colors.green],
+//                   ),
+//                   BarChartRodData(
+//                     y: entry.value.late.toDouble(),
+//                     colors: [Colors.yellow],
+//                   ),
+//                   BarChartRodData(
+//                     y: entry.value.absent.toDouble(),
+//                     colors: [Colors.red],
+//                   ),
+//                 ],
+//                 showingTooltipIndicators: [0],
+//               ),
+//             )
+//             .toList(),
+//       ),
+//     );
+//   }
+// }
 
 class AttendanceData {
   final String month;
@@ -529,18 +493,113 @@ class LegendIndicator extends StatelessWidget {
     );
   }
 }
+class DetailAbsensiData {
+  final String nama;
+  final String jabatan_pegawai;
+  final String nip;
+  final int usia;
+  final String kantor_cabang_pegawai;
+  final String avatar;
 
-class EmployeeDetailPage extends StatelessWidget {
-  final Employee employee;
+  DetailAbsensiData({
+    required this.nama,
+    required this.jabatan_pegawai,
+    required this.nip,
+    required this.usia,
+    required this.kantor_cabang_pegawai,
+    required this.avatar,
+  });
 
-  const EmployeeDetailPage({required this.employee});
+  factory DetailAbsensiData.fromJson(Map<String, dynamic> json) {
+    return DetailAbsensiData(
+      nama: json['nama'],
+      jabatan_pegawai: json['jabatan'],
+      nip: json['nip'],
+      usia: json['usia'],
+      kantor_cabang_pegawai: json['cabang'],
+      avatar: json['avatar'],
+    );
+  }
+}
+
+class AbsensiBulanData {
+  final String bulanTahun;
+  final int total;
+
+  AbsensiBulanData({
+    required this.bulanTahun,
+    required this.total,
+  });
+
+  factory AbsensiBulanData.fromJson(Map<String, dynamic> json) {
+    return AbsensiBulanData(
+      bulanTahun: json['bulan_tahun'],
+      total: json['total'],
+    );
+  }
+}
+
+class AbsensiDetailPage extends StatefulWidget {
+  final String pegawaiId;
+  //  final AbsensiData absensiData;
+  const AbsensiDetailPage({required this.pegawaiId, Key? key}) : super(key: key);
+  @override
+  _AbsensiDetailPageState createState() => _AbsensiDetailPageState();
+}
+class _AbsensiDetailPageState extends State<AbsensiDetailPage> {
+  DetailAbsensiData? detailAbsensiData;
+  List<AbsensiBulanData> absensiBulanData = [];
+  bool isLoading = true;
+  @override
+  void initState() {
+    super.initState();
+    fetchDetailAbsensi();
+  }
+  Future<void> fetchDetailAbsensi() async {
+  String apiUrl = '/detailabsensireport/${widget.pegawaiId}';
+
+  try {
+    var response = await ApiHandler().getData(apiUrl);
+    debugPrint('API Response Status Code: ${response.statusCode}');
+    debugPrint('API Response Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      var jsonResponse = jsonDecode(response.body);
+
+      if (jsonResponse is List && jsonResponse.isNotEmpty) {
+        // Mengambil data detail pegawai dari item pertama
+        var detailData = jsonResponse[0];
+        setState(() {
+          // Parsing data pegawai
+          detailAbsensiData = DetailAbsensiData.fromJson(detailData);
+          
+          // Mengambil data absensi per bulan (selain item pertama)
+          absensiBulanData = jsonResponse
+              .map<AbsensiBulanData>((item) => AbsensiBulanData.fromJson(item))
+              .toList();
+
+          isLoading = false;
+        });
+      } else {
+        debugPrint('Data tidak valid');
+        setState(() => isLoading = false);
+      }
+    } else {
+      debugPrint('Gagal mengambil data Absensi detail');
+      setState(() => isLoading = false);
+    }
+  } catch (e) {
+    debugPrint('Error: $e');
+    setState(() => isLoading = false);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          employee.name,
+          'Detail Absensi',
           style: TextStyle(fontSize: 20, color: Colors.white),
         ),
         backgroundColor: Color(0xFF007BFF),
@@ -554,107 +613,169 @@ class EmployeeDetailPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Employee details
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const CircleAvatar(
-                  radius: 40,
-                  backgroundImage: AssetImage('assets/images/profile.jpeg'),
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Mawar Eva de Jongh',
-                      style:
-                          TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Front end Development',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF007BFF),
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'NIP: 0988767656s657897',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    Text(
-                      'Usia : 25 Tahun',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    Text(
-                      'Kantor : Kantor Pusat Operasional',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          'INDEX RATA-RATA KPI 4.0',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF007BFF),
+            Card(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.all(10),
+                    child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.blueAccent,
+                          borderRadius: BorderRadius.circular(30),
+                          image: DecorationImage(
+                            image: (detailAbsensiData?.avatar ?? '').isNotEmpty &&
+                              Uri.tryParse(detailAbsensiData?.avatar ?? '')?.hasAbsolutePath == true
+                          ? NetworkImage(detailAbsensiData!.avatar) // Gunakan ! karena sudah dicek null-nya
+                          : const AssetImage('assets/images/profile.jpeg') as ImageProvider,
+                          fit: BoxFit.cover
                           ),
                         ),
-                        SizedBox(width: 8),
-                        Row(
-                          children: [
-                            Icon(Icons.star,
-                                color: Colors.amber,
-                                size: 15), // Changed to gold
-                            Icon(Icons.star,
-                                color: Colors.amber,
-                                size: 15), // Changed to gold
-                            Icon(Icons.star,
-                                color: Colors.amber,
-                                size: 15), // Changed to gold
-                            Icon(Icons.star,
-                                color: Colors.amber,
-                                size: 15), // Changed to gold
-                            Icon(Icons.star_border,
-                                color: Colors.amber,
-                                size: 15), // Changed to golds.star,
-                          ],
+                      ),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${detailAbsensiData?.nama}',
+                        style:
+                            TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        '${detailAbsensiData?.jabatan_pegawai}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF007BFF),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'NIP: ${detailAbsensiData?.nip}',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        'Usia : ${detailAbsensiData?.usia} Tahun',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        'Kantor : ${detailAbsensiData?.kantor_cabang_pegawai}',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      SizedBox(height: 4),
+                      // Row(
+                      //   children: [
+                      //     Text(
+                      //       'INDEX RATA-RATA KPI 4.0',
+                      //       style: TextStyle(
+                      //         fontWeight: FontWeight.bold,
+                      //         color: Color(0xFF007BFF),
+                      //       ),
+                      //     ),
+                      //     SizedBox(width: 8),
+                      //     Row(
+                      //       children: [
+                      //         Icon(Icons.star,
+                      //             color: Colors.amber,
+                      //             size: 15), // Changed to gold
+                      //         Icon(Icons.star,
+                      //             color: Colors.amber,
+                      //             size: 15), // Changed to gold
+                      //         Icon(Icons.star,
+                      //             color: Colors.amber,
+                      //             size: 15), // Changed to gold
+                      //         Icon(Icons.star,
+                      //             color: Colors.amber,
+                      //             size: 15), // Changed to gold
+                      //         Icon(Icons.star_border,
+                      //             color: Colors.amber,
+                      //             size: 15), // Changed to golds.star,
+                      //       ],
+                      //     ),
+                      //   ],
+                      // ),
+                    ],
+                  ),
+                ],
+              ),
             ),
 
             SizedBox(height: 20),
+            if (absensiBulanData != null && absensiBulanData!.isNotEmpty)
+  Expanded(
+    child: Table(
+      border: TableBorder.all(color: Colors.grey), // Adds borders to the table
+      columnWidths: const <int, TableColumnWidth>{
+        0: FlexColumnWidth(2), // Width for the month column
+        1: FlexColumnWidth(1), // Width for the hadir (attendance) column
+        // 2: FlexColumnWidth(1), // Width for the cuti (leave) column
+      },
+      children: [
+        _buildTableHeaderRow(), // Table header
+        ...absensiBulanData!.map((data) => _buildTableRow(data)).toList(), // Map each data to table rows
+      ],
+    ),
+  ),
             // Add spacing before attendance section
-            _buildAttendanceTable()
+            // _buildAttendanceTable()
           ],
         ),
       ),
     );
   }
 
+  TableRow _buildTableRow(AbsensiBulanData data) {
+  return TableRow(
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Text(
+          data.bulanTahun, // Display the month
+          style: TextStyle(fontSize: 14, color: Colors.black),
+          textAlign: TextAlign.center,
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Text(
+          '${data.total} h', // Display the attendance total
+          style: TextStyle(fontSize: 14, color: Colors.black),
+          textAlign: TextAlign.center,
+        ),
+      ),
+      // Padding(
+      //   padding: const EdgeInsets.all(8.0),
+      //   child: Text(
+      //     '0 h', // Placeholder for "Cuti" (Leave), replace with actual data if available
+      //     style: TextStyle(fontSize: 14, color: Colors.black),
+      //     textAlign: TextAlign.center,
+      //   ),
+      // ),
+    ],
+  );
+}
+
   // Helper method to build attendance rows
-  Widget _buildAttendanceTable() {
-    return Table(
-      border: TableBorder.all(color: Colors.grey), // Adds borders to the table
-      columnWidths: const <int, TableColumnWidth>{
-        0: FlexColumnWidth(2), // Width for the month column
-        1: FlexColumnWidth(1), // Width for the hadir (attendance) column
-        2: FlexColumnWidth(1), // Width for the cuti (leave) column
-      },
-      children: [
-        _buildTableHeaderRow(), // Table header
-        _buildTableRow('Januari', '23 h', '2 h'), // Data for January
-        _buildTableRow('Februari', '23 h', '2 h'), // Data for February
-        _buildTableRow('Maret', '23 h', '2 h'), // Data for March
-        // Add more rows as needed
-      ],
-    );
-  }
+  // Widget _buildAttendanceTable() {
+  //   return Table(
+  //     border: TableBorder.all(color: Colors.grey), // Adds borders to the table
+  //     columnWidths: const <int, TableColumnWidth>{
+  //       0: FlexColumnWidth(2), // Width for the month column
+  //       1: FlexColumnWidth(1), // Width for the hadir (attendance) column
+  //       2: FlexColumnWidth(1), // Width for the cuti (leave) column
+  //     },
+  //     children: [
+  //       _buildTableHeaderRow(), // Table header
+  //       _buildTableRow('Januari', '23 h', '2 h'), // Data for January
+  //       _buildTableRow('Februari', '23 h', '2 h'), // Data for February
+  //       _buildTableRow('Maret', '23 h', '2 h'), // Data for March
+  //       // Add more rows as needed
+  //     ],
+  //   );
+  // }
 
   // Helper method to build the table header
   TableRow _buildTableHeaderRow() {
@@ -685,59 +806,59 @@ class EmployeeDetailPage extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text(
-            'Cuti', // Leave
-            style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-            textAlign: TextAlign.center,
-          ),
-        ),
+        // Padding(
+        //   padding: const EdgeInsets.all(8.0),
+        //   child: Text(
+        //     'Cuti', // Leave
+        //     style: TextStyle(
+        //         fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+        //     textAlign: TextAlign.center,
+        //   ),
+        // ),
       ],
     );
   }
 
   // Helper method to build a table row for attendance data
-  TableRow _buildTableRow(String month, String hadir, String cuti) {
-    return TableRow(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: month == 'Maret' // Apply rounded corners to last row
-            ? BorderRadius.only(
-                bottomLeft: Radius.circular(10), // Rounded bottom corners
-                bottomRight: Radius.circular(10),
-              )
-            : BorderRadius.zero,
-      ),
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text(
-            month,
-            style: TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text(
-            hadir,
-            style: TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text(
-            cuti,
-            style: TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ],
-    );
-  }
+  // TableRow _buildTableRow(String month, String hadir, String cuti) {
+  //   return TableRow(
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: month == 'Maret' // Apply rounded corners to last row
+  //           ? BorderRadius.only(
+  //               bottomLeft: Radius.circular(10), // Rounded bottom corners
+  //               bottomRight: Radius.circular(10),
+  //             )
+  //           : BorderRadius.zero,
+  //     ),
+  //     children: [
+  //       Padding(
+  //         padding: const EdgeInsets.all(8.0),
+  //         child: Text(
+  //           month,
+  //           style: TextStyle(fontSize: 16),
+  //           textAlign: TextAlign.center,
+  //         ),
+  //       ),
+  //       Padding(
+  //         padding: const EdgeInsets.all(8.0),
+  //         child: Text(
+  //           hadir,
+  //           style: TextStyle(fontSize: 16),
+  //           textAlign: TextAlign.center,
+  //         ),
+  //       ),
+  //       Padding(
+  //         padding: const EdgeInsets.all(8.0),
+  //         child: Text(
+  //           cuti,
+  //           style: TextStyle(fontSize: 16),
+  //           textAlign: TextAlign.center,
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  // }
 }
 
 class Group56 extends StatelessWidget {
