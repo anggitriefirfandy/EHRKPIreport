@@ -12,7 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   google_fonts: ^4.0.4
-  fl_chart: ^0.35.0
+  fl_chart: ^0.63.0
   cupertino_icons: ^1.0.8 
   percent_indicator: ^4.2.2
   flutter_rating_bar: ^4.0.0

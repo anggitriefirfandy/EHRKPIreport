@@ -7,6 +7,8 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:kpi/api/api.dart';
 import 'package:http/http.dart' as http;
+import 'package:kpi/widget/tablecuti.dart';
+import 'package:kpi/widget/widgetcuti.dart';
 
 class EmployeeLeavePage extends StatefulWidget {
   const EmployeeLeavePage({required this.prevPage, super.key});
@@ -51,27 +53,22 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
   } 
   Future<List<LeaveData>> getDataCuti() async {
   try {
-    String month = months.indexOf(selectedMonth).toString(); // Mendapatkan bulan sebagai string
-    String year = DateTime.now().year.toString(); // Mendapatkan tahun saat ini
-
-    var url = '/cutireport?month=$month&year=$year'; // URL dengan parameter bulan dan tahun
-    print('Fetching data with filters - Month: $month, Year: $year'); 
+    String month = months.indexOf(selectedMonth).toString();
+    String year = DateTime.now().year.toString();
+    var url = '/cutireport';
+    
     var dat = await ApiHandler().getData(url);
-    // print('Status Code: ${dat.statusCode}');
-    // print('Response Body: ${dat.body}');
-   
+
     if (dat.statusCode == 200 && dat.body != null) {
       final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
-      // print('Decoded JSON: $jsonResponse');
-      if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
-        final List<dynamic> data = jsonResponse['data'];
-        // print('Raw Data: $data');
-        List<LeaveData> leaveDataList =
-            data.map((item) => LeaveData.fromJson(item)).toList();
-           
-        // print('Leave Data List: $leaveDataList');
+       debugPrint('API Response cuti Status Code: ${dat.statusCode}');
+      debugPrint('API Response cuti Body: ${dat.body}');
 
-        // Ekstrak daftar cabang unik
+      if (jsonResponse.containsKey('data') && jsonResponse['data'] is Map) {
+        final Map<String, dynamic> dataMap = jsonResponse['data'];
+
+        List<LeaveData> leaveDataList = dataMap.values.map((item) => LeaveData.fromJson(item)).toList();
+
         final branchSet = <String>{'Semua Cabang'};
         for (var leaveData in leaveDataList) {
           branchSet.add(leaveData.kantorCabang);
@@ -100,13 +97,12 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
 
 
 
+
   void applyFilter() {
     setState(() {
       filteredLeaveData = allLeaveData.where((leave) {
         bool matchesBranch = selectedBranch == 'Semua Cabang' || leave.kantorCabang == selectedBranch;
-        bool matchesMonth = selectedMonth == 'Semua Bulan' || 
-            DateTime.parse(leave.tglMulai).month == months.indexOf(selectedMonth);
-        return matchesBranch && matchesMonth;
+        return matchesBranch;
       }).toList();
       currentPage = 1; // Reset ke halaman pertama setelah filter diubah
       totalPages = (filteredLeaveData.length / itemsPerPage).ceil();
@@ -186,25 +182,25 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: DropdownButton<String>(
-                    value: selectedMonth,
-                    isExpanded: true,
-                    items: months.map((month) {
-                      return DropdownMenuItem(
-                        value: month,
-                        child: Text(month),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedMonth = value!;
-                        applyFilter(); // Panggil applyFilter untuk memperbarui data berdasarkan bulan yang dipilih
-                      });
-                    },
-                  )
+                // Expanded(
+                //   child: DropdownButton<String>(
+                //     value: selectedMonth,
+                //     isExpanded: true,
+                //     items: months.map((month) {
+                //       return DropdownMenuItem(
+                //         value: month,
+                //         child: Text(month),
+                //       );
+                //     }).toList(),
+                //     onChanged: (value) {
+                //       setState(() {
+                //         selectedMonth = value!;
+                //         applyFilter(); // Panggil applyFilter untuk memperbarui data berdasarkan bulan yang dipilih
+                //       });
+                //     },
+                //   )
 
-                ),
+                // ),
               ],
             ),
           ),
@@ -253,60 +249,63 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
 
 
 class LeaveData {
+  final String pegawaiId;
   final String nama;
   final String profil;
   final String nip;
   // final String tanggal_pengisian;
   final String jenisCuti;
-  final int kategoriCuti;
-  final String tglMulai;
-  final String tglSelesai;
-  final int jumlahAmbil;
-  final int sisaCuti;
-  final int statusCuti;
+  // final int kategoriCuti;
+  // final String tglMulai;
+  // final String tglSelesai;
+  // final int jumlahAmbil;
+  // final int sisaCuti;
+  // final int statusCuti;
   final String kantorCabang;
   final String jabatan;
   final String keterangan;
-  final int total;
+  // final int total;
   final int usia;
 
   LeaveData({
+    required this.pegawaiId,
     required this.nama,
     required this.profil,
     required this.nip,
     // required this.tanggal_pengisian,
     required this.jenisCuti,
-    required this.kategoriCuti,
-    required this.tglMulai,
-    required this.tglSelesai,
-    required this.jumlahAmbil,
-    required this.sisaCuti,
-    required this.statusCuti,
+    // required this.kategoriCuti,
+    // required this.tglMulai,
+    // required this.tglSelesai,
+    // required this.jumlahAmbil,
+    // required this.sisaCuti,
+    // required this.statusCuti,
     required this.kantorCabang,
     required this.jabatan,
     required this.keterangan,
-    required this.total,
+    // required this.total,
     required this.usia
   });
 
   factory LeaveData.fromJson(Map<String, dynamic> json) {
     return LeaveData(
-      nama:json['nama'],
-      profil: json['profil'],
-      nip: json['nip'],
+      pegawaiId: json['pegawai_id'] ?? 'unknown',
+      nama:json['nama'] ?? 'unknown',
+      profil: json['profil'] ?? '',
+      nip: json['nip'] ?? '',
       // tanggal_pengisian: json['tanggal_pengisian'],
-      jenisCuti: json['jenis_cuti'],
-      kategoriCuti: json['kategori_cuti'],
-      tglMulai: json['tgl_mulai'],
-      tglSelesai: json['tgl_selesai'],
-      jumlahAmbil: json['jumlah_ambil'],
-      sisaCuti: json['sisa_cuti'],
-      statusCuti: json['status_cuti'],
-      kantorCabang: json['kantor_cabang'],
-      jabatan: json['jabatan'],
-      keterangan: json['keterangan'],
-      total: json['total'],
-      usia: json['usia']
+      jenisCuti: json['jenis_cuti'] ?? '',
+      // kategoriCuti: json['kategori_cuti'],
+      // tglMulai: json['tgl_mulai'],
+      // tglSelesai: json['tgl_selesai'],
+      // jumlahAmbil: json['jumlah_ambil'] ?? '',
+      // sisaCuti: json['sisa_cuti'] ?? '',
+      // statusCuti: json['status_cuti'] ?? '',
+      kantorCabang: json['kantor_cabang'] ?? '',
+      jabatan: json['jabatan'] ?? '',
+      keterangan: json['keterangan'] ?? "",
+      // total: json['total'] ?? '',
+      usia: json['usia'] ?? 0
     );
   }
 }
@@ -333,7 +332,7 @@ class EmployeeCard extends StatelessWidget {
               GestureDetector(
                 onTap: () {
                   // Navigasi ke halaman detail cuti
-                  Get.to(() => CutiDetailPage(leaveData: employee));
+                  Get.to(() => CutiDetailPage(leaveData: employee, pegawaiId: employee.pegawaiId));
                 },
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,11 +404,17 @@ class EmployeeCard extends StatelessWidget {
 
 
 
-class CutiDetailPage extends StatelessWidget {
+class CutiDetailPage extends StatefulWidget {
   final LeaveData leaveData;
+  final String pegawaiId;
 
-  const CutiDetailPage({required this.leaveData, Key? key}) : super(key: key);
+  const CutiDetailPage({required this.leaveData,required this.pegawaiId, Key? key}) : super(key: key);
 
+  @override
+  State<CutiDetailPage> createState() => _CutiDetailPageState();
+}
+
+class _CutiDetailPageState extends State<CutiDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -438,10 +443,10 @@ class CutiDetailPage extends StatelessWidget {
                     color: Colors.blueAccent,
                     borderRadius: BorderRadius.circular(40),
                     image: DecorationImage(
-                      image: leaveData.profil.isNotEmpty
-                          ? (leaveData.profil.startsWith('http')
-                              ? NetworkImage(leaveData.profil) // URL gambar
-                              : AssetImage(leaveData.profil) as ImageProvider) // Path lokal
+                      image: widget.leaveData.profil.isNotEmpty
+                          ? (widget.leaveData.profil.startsWith('http')
+                              ? NetworkImage(widget.leaveData.profil) // URL gambar
+                              : AssetImage(widget.leaveData.profil) as ImageProvider) // Path lokal
                           : const AssetImage('assets/images/default.jpg'), // Gambar default
                       fit: BoxFit.cover,
                     ),
@@ -453,20 +458,20 @@ class CutiDetailPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${leaveData.nama}',
+                      '${widget.leaveData.nama}',
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    Text('${leaveData.jabatan}', style: const TextStyle(fontSize: 16)),
-                    Text('NIP: ${leaveData.nip}', style: const TextStyle(fontSize: 16)),
-                    Text('Usia: ${leaveData.usia}', style: const TextStyle(fontSize: 16)),
-                    Text('Kantor: ${leaveData.kantorCabang}', style: const TextStyle(fontSize: 16)),
+                    Text('${widget.leaveData.jabatan}', style: const TextStyle(fontSize: 16)),
+                    Text('NIP: ${widget.leaveData.nip}', style: const TextStyle(fontSize: 16)),
+                    Text('Usia: ${widget.leaveData.usia}', style: const TextStyle(fontSize: 16)),
+                    Text('Kantor: ${widget.leaveData.kantorCabang}', style: const TextStyle(fontSize: 16)),
                   ],
                 ),
               ],
             ),
 
             
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
             // Text('Jenis Cuti: ${leaveData.jenisCuti}', style: const TextStyle(fontSize: 16)),
             // Text(
             //   'Tanggal Mulai: ${DateFormat('d MMMM yyyy', 'id_ID').format(DateTime.parse(leaveData.tglMulai))}',
@@ -479,139 +484,63 @@ class CutiDetailPage extends StatelessWidget {
             // const SizedBox(height: 10),
             // Text('Keterangan: ${leaveData.keterangan}', style: const TextStyle(fontSize: 16)),
             // // Anda bisa menambahkan informasi lebih lanjut di sini
-            Padding(padding: const EdgeInsets.all(10.0),
-            child: Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFF007BFF), 
+            Widgetcuti(pegawaiId: widget.pegawaiId),
+          //   Padding(padding: const EdgeInsets.all(10.0),
+          //   child: Container(
+          //     padding: const EdgeInsets.all(16.0),
+          //     decoration: BoxDecoration(
+          //       color: const Color(0xFF007BFF), 
                 
-                borderRadius: BorderRadius.circular(8.0), 
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween, 
-                children: [
-                  Column(
-                    children: [
-                      Text(
-                        '${leaveData.total.toString()}h',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                    const Text(
-                      'Total Cuti',
-                      style: TextStyle(fontSize: 12, color: Colors.white),
-                    ),
-                  ],
-                ),
-                Column(
-                  children: [
-                    Text(
-                      '${leaveData.jumlahAmbil.toString()}h',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Cuti Diambil',
-                      style: TextStyle(fontSize: 12, color: Colors.white),
-                    ),
-                  ],
-                ),
-                Column(
-                  children: [
-                    Text(
-                      '${leaveData.sisaCuti.toString()}h',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Sisa Cuti',
-                      style: TextStyle(fontSize: 12, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          )
-            ),
-              const SizedBox(height: 10),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  double screenWidth = constraints.maxWidth;
-                  double columnWidth = screenWidth / 4; // Pembagian kolom secara proporsional
-
-                  // Mengatur kolom dengan lebar proporsional dan menghindari overflow
-                  return Table(
-                    border: TableBorder.all(color: Colors.grey, width: 1),
-                    columnWidths: {
-                      0: FixedColumnWidth(columnWidth < 80 ? 80 : columnWidth), // Kolom pertama
-                      1: FixedColumnWidth(columnWidth < 80 ? 80 : columnWidth), // Kolom kedua
-                      2: FixedColumnWidth(columnWidth < 80 ? 80 : columnWidth), // Kolom ketiga
-                      3: FixedColumnWidth(columnWidth < 80 ? 80 : columnWidth), // Kolom keempat
-                    },
-                    children: [
-                      TableRow(
-                        decoration: BoxDecoration(color: Colors.grey.shade200),
-                        children: const [
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text(
-                              'Jenis Cuti',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text(
-                              'Tanggal Mulai',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text(
-                              'Tanggal Selesai',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text(
-                              'Keterangan',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      TableRow(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(leaveData.jenisCuti),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              DateFormat('d MMMM yyyy', 'id_ID')
-                                  .format(DateTime.parse(leaveData.tglMulai)),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              DateFormat('d MMMM yyyy', 'id_ID')
-                                  .format(DateTime.parse(leaveData.tglSelesai)),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(leaveData.keterangan),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-              )
+          //       borderRadius: BorderRadius.circular(8.0), 
+          //     ),
+          //     child: Row(
+          //       mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+          //       children: [
+          //         Column(
+          //           children: [
+          //         //     Text(
+          //         //       '${leaveData.total.toString()}h',
+          //         //   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          //         // ),
+          //         const SizedBox(height: 4),
+          //           const Text(
+          //             'Total Cuti',
+          //             style: TextStyle(fontSize: 12, color: Colors.white),
+          //           ),
+          //         ],
+          //       ),
+          //       Column(
+          //         children: [
+          //           // Text(
+          //           //   '${leaveData.jumlahAmbil.toString()}h',
+          //           //   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          //           // ),
+          //           const SizedBox(height: 4),
+          //           const Text(
+          //             'Cuti Diambil',
+          //             style: TextStyle(fontSize: 12, color: Colors.white),
+          //           ),
+          //         ],
+          //       ),
+          //       Column(
+          //         children: [
+          //           // Text(
+          //           //   '${leaveData.sisaCuti.toString()}h',
+          //           //   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          //           // ),
+          //           const SizedBox(height: 4),
+          //           const Text(
+          //             'Sisa Cuti',
+          //             style: TextStyle(fontSize: 12, color: Colors.white),
+          //           ),
+          //         ],
+          //       ),
+          //     ],
+          //   ),
+          // )
+          //   ),
+          Tablecuti(pegawaiId: widget.pegawaiId),
+              
 
 
           ],
@@ -620,208 +549,3 @@ class CutiDetailPage extends StatelessWidget {
     );
   }
 }
-
-
-
-// Dummy CutiScreen class, replace this with your actual screen
-// class CutiScreen extends StatelessWidget {
-//   final Map<String, dynamic> employee = {
-//     'name': 'Mawar Eva de Jongh',
-//     'position': 'Front end Development',
-//     'nip': '0988767656s657897',
-//     'age': 25,
-//     'office': 'Kantor Pusat',
-//     'leaves': [
-//       {
-//         'start_date': '2023-10-01',
-//         'end_date': '2023-10-05',
-//         'type': 'Cuti Tahunan',
-//         'description': 'Liburan keluarga',
-//       },
-//       {
-//         'start_date': '2023-11-10',
-//         'end_date': '2023-11-12',
-//         'type': 'Cuti Sakit',
-//         'description': 'Demam',
-//       },
-//     ],
-//   };
-
-//    @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text(
-//           'Cuti',
-//           style: TextStyle(fontSize: 20),
-//         ),
-//         backgroundColor: const Color(0xFF007BFF),
-//         foregroundColor: Colors.white,
-//         centerTitle: true,
-//       ),
-//       body: Padding(
-//         padding: const EdgeInsets.all(16.0),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             // Profile section
-//             _buildProfileSection(),
-//             const SizedBox(height: 16),
-
-//             // Container for tracking items (Cuti, Cuti diambil, Sisa cuti)
-//             _buildTrackingContainer(),
-//             const SizedBox(height: 16),
-
-//             // Table for leave details
-//             _buildLeaveTable(),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   Widget _buildProfileSection() {
-//     return Row(
-//       crossAxisAlignment: CrossAxisAlignment.start,
-//       children: [
-//         const CircleAvatar(
-//           radius: 40,
-//           backgroundImage: AssetImage('assets/images/profile.jpeg'),
-//         ),
-//         const SizedBox(width: 16),
-//         Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             Text(
-//               employee['name'] ?? 'N/A',
-//               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-//             ),
-//             const SizedBox(height: 4),
-//             Text(
-//               employee['position'] ?? 'N/A',
-//               style: const TextStyle(fontSize: 14, color: Color(0xFF007BFF)),
-//             ),
-//             const SizedBox(height: 4),
-//             Text('NIP: ${employee['nip'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-//             Text('Usia : ${employee['age'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-//             Text('Kantor : ${employee['office'] ?? 'N/A'}', style: const TextStyle(fontSize: 14)),
-//             const SizedBox(height: 4),
-//             _buildKpiRow(),
-//           ],
-//         ),
-//       ],
-//     );
-//   }
-
-//   Widget _buildKpiRow() {
-//     return Row(
-//       children: [
-//         const Text(
-//           'INDEX RATA-RATA KPI 4.0',
-//           style: TextStyle(
-//             fontSize: 14,
-//             fontWeight: FontWeight.bold,
-//             color: Color(0xFF007BFF),
-//           ),
-//         ),
-//         const SizedBox(width: 8),
-//         const Row(
-//           children: [
-//             Icon(Icons.star, color: Colors.amber, size: 15),
-//             Icon(Icons.star, color: Colors.amber, size: 15),
-//             Icon(Icons.star, color: Colors.amber, size: 15),
-//             Icon(Icons.star, color: Colors.amber, size: 15),
-//             Icon(Icons.star_border, color: Colors.amber, size: 15),
-//           ],
-//         ),
-//       ],
-//     );
-//   }
-
-//   Widget _buildTrackingContainer() {
-//     return Container(
-//       padding: const EdgeInsets.all(8),
-//       decoration: BoxDecoration(
-//         border: Border.all(color: Colors.grey),
-//         borderRadius: BorderRadius.circular(8),
-//         color: const Color(0xFF007BFF),
-//       ),
-//       child: Row(
-//         mainAxisAlignment: MainAxisAlignment.spaceAround,
-//         children: [
-//           buildTrackingItem('25h', 'Cuti'),
-//           buildTrackingItem('2h', 'Cuti diambil'),
-//           buildTrackingItem('23h', 'Sisa cuti'),
-//         ],
-//       ),
-//     );
-//   }
-
-//   Widget _buildLeaveTable() {
-//     return Table(
-//       border: TableBorder.all(color: Colors.grey),
-//       columnWidths: const {
-//         0: FractionColumnWidth(0.3),
-//         1: FractionColumnWidth(0.3),
-//         2: FractionColumnWidth(0.2),
-//         3: FractionColumnWidth(0.2),
-//       },
-//       children: [
-//         TableRow(
-//           decoration: BoxDecoration(color: Colors.blue[50]),
-//           children: [
-//             tableCell('Cuti Mulai', isHeader: true),
-//             tableCell('Cuti Selesai', isHeader: true),
-//             tableCell('Jenis Cuti', isHeader: true),
-//             tableCell('Ket Cuti', isHeader: true),
-//           ],
-//         ),
-//         ...employee['leaves'].map<TableRow>((leave) {
-//           return TableRow(
-//             children: [
-//               tableCell(leave['start_date']),
-//               tableCell(leave['end_date']),
-//               tableCell(leave['type']),
-//               tableCell(leave['description']),
-//             ],
-//           );
-//         }).toList(),
-//       ],
-//     );
-//   }
-
-//   Widget buildTrackingItem(String value, String label) {
-//     return Column(
-//       children: [
-//         Text(
-//           value,
-//           style: const TextStyle(
-//             fontSize: 20,
-//             fontWeight: FontWeight.bold,
-//             color: Colors.black,
-//           ),
-//         ),
-//         Text(
-//           label,
-//           style: const TextStyle(
-//             color: Colors.white,
-//           ),
-//         ),
-//       ],
-//     );
-//   }
-
-//   Widget tableCell(String text, {bool isHeader = false}) {
-//     return Padding(
-//       padding: const EdgeInsets.all(8.0),
-//       child: Text(
-//         text,
-//         textAlign: TextAlign.center,
-//         style: TextStyle(
-//           fontSize: 14,
-//           fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-//         ),
-//       ),
-//     );
-//   }
-// }

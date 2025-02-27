@@ -30,7 +30,7 @@ class ApiHandler {
     print('tes connectioncheck');
     SharedPreferences locStor = await SharedPreferences.getInstance();
     if (locStor.getString('con_type') == '2') {
-      _apiurl = 'https://app.koneksiehr.id/api/v1';
+      // _apiurl = 'https://app.koneksiehr.id/api/ehrreport';
     }
     String? usr = locStor.getString('user');
     if (usr != null) {
@@ -241,6 +241,36 @@ class ApiHandler {
       Get.offAll(() => LoginPage());
     }
     // Get.offAll(LoginPage());
+  }
+  postData(apiUrl, data, {bldctx = null}) async {
+    print('tes postdata');
+    EasyLoading.show(status: 'Loading', maskType: EasyLoadingMaskType.black);
+    await _connectionCheck();
+    await _fakecheck();
+    await _getappver();
+    var fullUrl = _apiurl + apiUrl;
+    await _getToken();
+    var res = await http
+        .post(Uri.parse(fullUrl), body: data, headers: _setHeaders())
+        .onError((error, stackTrace) => http.Response(
+            jsonEncode({'success': false, 'message': error.toString()}), 401))
+        .timeout(Duration(seconds: _deftimout), onTimeout: () {
+      Fluttertoast.showToast(msg: 'Request Timed Out');
+      return http.Response(
+          jsonEncode({'success': false, 'message': 'Request Timed Out'}), 408);
+    });
+    EasyLoading.dismiss();
+    if (res.statusCode == 408) {
+      _changeConMethod(b: bldctx);
+    } else if (res.statusCode == 401) {
+      var body = jsonDecode(res.body);
+      if (body is Map) {
+        if (body['message'].toString().contains('Failed host lookup')) {
+          _changeConMethod(b: bldctx);
+        }
+      }
+    }
+    return res;
   }
   _setHeaders({String content_type = 'application/json'}) => {
         'Fltappver': _appver,
