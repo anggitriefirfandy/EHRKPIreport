@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:developer';
-import 'package:kpi/pagelogin.dart';
+import 'package:ehr_report/pagelogin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:platform_device_id/platform_device_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';

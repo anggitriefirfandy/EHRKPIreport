@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:kpi/api/api.dart';
+import 'package:ehr_report/api/api.dart';
 
 class LemburPage extends StatefulWidget {
   const LemburPage({required this.prevPage, super.key});
@@ -51,6 +51,15 @@ class _LemburPageState extends State<LemburPage> {
   bool isLoading = true;
   String search = "";
   Timer? _debounce;
+  List<LemburData> allLemburData = [];
+  List<LemburData> filteredLemburData = [];
+  List<LemburData> paginatedLemburData = [];
+  int currentPage = 1;
+  final int itemsPerPage = 10; // Jumlah data per halaman
+  int totalPages = 1;
+  String selectedBranch = 'Semua Cabang'; // Default pilihan cabang
+  
+  List<String> branches = ['Semua Cabang'];
 
   @override
   void initState() {
@@ -77,13 +86,21 @@ class _LemburPageState extends State<LemburPage> {
         final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
         if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
           final List<dynamic> data = jsonResponse['data'];
-          List<LemburData> tempList =
+          List<LemburData> lemburDataList =
               data.map((item) => LemburData.fromJson(item)).toList();
-
+               final branchSet = <String>{'Semua Cabang'};
+        for (var lemburData in lemburDataList) {
+          branchSet.add(lemburData.cabang);
+        }
           setState(() {
-            lemburDataList = tempList;
-            isLoading = false;
+             branches = branchSet.toList();
+          allLemburData = lemburDataList;
+          filteredLemburData = lemburDataList;
+          totalPages = (filteredLemburData.length / itemsPerPage).ceil();
+          updatePaginatedData();
+          isLoading = false; 
           });
+          // return lemburDataList;
         } else {
           throw Exception('Invalid data format');
         }
@@ -98,20 +115,90 @@ class _LemburPageState extends State<LemburPage> {
     }
   }
   void _onSearchChanged(String value) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      fetchLemburData(query: value);
-    });
+  if (_debounce?.isActive ?? false) _debounce!.cancel();
 
+  _debounce = Timer(const Duration(milliseconds: 500), () {
     setState(() {
       search = value;
+      
+      if (value.isEmpty) {
+        // Jika input kosong, kembalikan ke semua data yang difilter
+        filteredLemburData = allLemburData.where((leave) {
+          return selectedBranch == 'Semua Cabang' || leave.cabang == selectedBranch;
+        }).toList();
+      } else {
+        // Filter berdasarkan nama dan cabang yang dipilih
+        filteredLemburData = allLemburData.where((item) {
+          bool matchesBranch = selectedBranch == 'Semua Cabang' ||
+              item.cabang.trim().toLowerCase() == selectedBranch.trim().toLowerCase();
+          bool matchesSearch = item.nama.toLowerCase().contains(value.toLowerCase());
+          return matchesBranch && matchesSearch;
+        }).toList();
+      }
+
+      currentPage = 1;
+      totalPages = (filteredLemburData.length / itemsPerPage).ceil();
+      updatePaginatedData();
     });
-  }
+  });
+}
   @override
   void dispose() {
     _debounce?.cancel();
     super.dispose();
+  }
+  void applyFilter() {
+    setState(() {
+      filteredLemburData = allLemburData.where((leave) {
+        bool matchesBranch = selectedBranch == 'Semua Cabang' || leave.cabang == selectedBranch;
+        return matchesBranch;
+      }).toList();
+      print('Branch dipilih: $selectedBranch');
+    print('Filtered Data Count: ${filteredLemburData.length}');
+      currentPage = 1; // Reset ke halaman pertama setelah filter diubah
+      totalPages = (filteredLemburData.length / itemsPerPage).ceil();
+      updatePaginatedData();
+    });
+    print('Applied Filters: Branch - $selectedBranch');
+  print('Filtered Data Count: ${filteredLemburData.length}');
+  }
+  void updatePaginatedData() {
+  int startIndex = (currentPage - 1) * itemsPerPage;
+  int endIndex = startIndex + itemsPerPage;
+
+  setState(() {
+    if (filteredLemburData.isEmpty) {
+      paginatedLemburData = [];
+      totalPages = 1; // Pastikan tidak menjadi 0
+      currentPage = 1;
+    } else {
+      totalPages = (filteredLemburData.length / itemsPerPage).ceil();
+      paginatedLemburData =
+          filteredLemburData.sublist(startIndex, endIndex.clamp(0, filteredLemburData.length));
+    }
+  });
+
+  print('Pagination: Halaman $currentPage dari $totalPages');
+  print('Data ditampilkan: ${paginatedLemburData.length}');
+}
+
+
+  void goToNextPage() {
+    if (currentPage < totalPages) {
+      setState(() {
+        currentPage++;
+        updatePaginatedData();
+      });
+    }
+  }
+
+  void goToPreviousPage() {
+    if (currentPage > 1) {
+      setState(() {
+        currentPage--;
+        updatePaginatedData();
+      });
+    }
   }
 
   @override
@@ -132,18 +219,32 @@ class _LemburPageState extends State<LemburPage> {
           // ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
+      body: Column(
           children: [
-            const Row(
+            Padding(padding: EdgeInsets.all(10),
+            child:Row(
               children: [
-                // Add your dropdowns here if needed
-              ],
-            ),
-            SizedBox(height: 20,),
-            Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                Expanded(
+                  child: DropdownButton<String>(
+                    value: selectedBranch,
+                    isExpanded: true,
+                    items: branches.map((branch) {
+                      return DropdownMenuItem(
+                        value: branch,
+                        child: Text(branch),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedBranch = value!;
+                        applyFilter();
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
                 child: TextField(
                   onChanged: _onSearchChanged, // Panggil otomatis saat mengetik
                   decoration: InputDecoration(
@@ -155,24 +256,32 @@ class _LemburPageState extends State<LemburPage> {
                   ),
                 ),
               ),
+                )
+              ],
+            ),
+            ),
+            
+            SizedBox(height: 20,),
+            
             const SizedBox(height: 16),
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : lemburDataList.isEmpty
+                  : paginatedLemburData.isEmpty
                       ? const Center(child: Text('No data found.'))
                       : ListView.builder(
-                          itemCount: lemburDataList.length,
+                          itemCount: paginatedLemburData.length,
                           itemBuilder: (context, index) {
-                            final lembur = lemburDataList[index];
+                            final lembur = paginatedLemburData[index];
                             return LemburCard(lembur: lembur);
                           },
                         ),
-            ),
+            )
+
           ],
         ),
-      ),
-    );
+      );
+    
   }
 }
 
@@ -406,28 +515,7 @@ class _LemburDetailScreenState extends State<LemburDetailScreen> {
                     style: TextStyle(fontSize: 14), // Menambahkan fontSize 14
                     ),
                     SizedBox(height: 4),
-                    // Row(
-                    //   children: [
-                    //     Text(
-                    //       'INDEX RATA-RATA KPI 4.0',
-                    //       style: TextStyle(
-                    //         fontSize: 14,
-                    //         fontWeight: FontWeight.bold,
-                    //         color: Color(0xFF007BFF),
-                    //       ),
-                    //     ),
-                    //     SizedBox(width: 8),
-                    //     Row(
-                    //       children: [
-                    //         Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
-                    //         Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
-                    //         Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
-                    //         Icon(Icons.star, color: Colors.amber, size: 15),  // Changed to gold
-                    //         Icon(Icons.star_border, color: Colors.amber, size: 15),  // Changed to golds.star,
-                    //       ],
-                    //     ),
-                    //   ],
-                    // ),
+                   
                   ],
                 ),
               ],
@@ -447,50 +535,61 @@ class _LemburDetailScreenState extends State<LemburDetailScreen> {
                   ? Center(child: CircularProgressIndicator())
                   : lemburDetails.isEmpty
                       ? Center(child: Text("Tidak ada data."))
-                      : ListView.builder(
-                          itemCount: lemburDetails.length,
-                          itemBuilder: (context, index) {
-                            final detail = lemburDetails[index];
-                            return Card(
-                              color: Colors.blue[50],
-                              margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16), // Jarak antar card
-                              elevation: 3, // Efek shadow
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      formatBulan(detail.bulan),
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      "${detail.jumlah} kali lembur",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        // color: Colors.blueAccent,
-                                      ),
-                                    ),
-                                  ],
+                      : SingleChildScrollView(
+                          scrollDirection: Axis.vertical,
+                          child: Table(
+                            border: TableBorder.all(color: Colors.grey.shade300, width: 1.5),
+                            columnWidths: const {
+                              0: FlexColumnWidth(2), 
+                              1: FlexColumnWidth(3),
+                            },
+                            children: [
+                              TableRow(
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.shade100,
                                 ),
+                                children: [
+                                  tableCell('Bulan', isHeader: true),
+                                  tableCell('Jumlah Lembur', isHeader: true),
+                                ],
                               ),
-                            );
-                          },
+                              ...lemburDetails.asMap().entries.map((entry) {
+                                int index = entry.key + 1;
+                                var detail = entry.value;
+                                return TableRow(
+                                  decoration: BoxDecoration(
+                                    color: index.isEven ? Colors.grey.shade100 : Colors.white,
+                                  ),
+                                  children: [
+                                    tableCell(formatBulan(detail.bulan)),
+                                    tableCell("${detail.jumlah} kali lembur"),
+                                  ],
+                                );
+                              }).toList(),
+                            ],
+                          ),
                         ),
             ),
+
 
           ],
         ),
       ),
     );
   }
+}
+Widget tableCell(String text, {bool isHeader = false}) {
+  return Padding(
+    padding: EdgeInsets.all(8),
+    child: Text(
+      text,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+      ),
+    ),
+  );
 }
 
 // New screen to show the details for a specific month

@@ -7,8 +7,8 @@ import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:kpi/api/api.dart';
-import 'package:kpi/halamanutama.dart';
+import 'package:ehr_report/api/api.dart';
+import 'package:ehr_report/halamanutama.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
@@ -24,6 +24,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   int _constat = 1; // Misalnya, 1 berarti koneksi tersedia
   String _errorMessage = '';
+  bool _isObscure = true;
 
   // Fungsi login
   void _login() async {
@@ -101,82 +102,135 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Background with curved shape
+          // Background dengan bentuk lengkung
           ClipPath(
             clipper: BackgroundClipper(),
             child: Container(
               height: MediaQuery.of(context).size.height * 0.6,
-              color: Color(0xFF007BFF),
-            ),
-          ),
-
-          // Logo at the very top
-          Positioned(
-            top: 300,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Image.asset(
-                'assets/images/logo.png',
-                width: 55,
-              ),
+              color: const Color(0xFF007BFF),
             ),
           ),
 
           SafeArea(
             child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(height: 260),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 80),
 
-                  // Illustration without shadow
-                  Image.asset(
-                    'assets/images/masuk.png',
-                    width: 500,
-                    height: 220,
-                    fit: BoxFit.contain,
-                  ),
-                  SizedBox(height: 100),
+                    // Logo
+                    Image.asset(
+                      'assets/images/logo.png',
+                      width: 80,
+                    ),
+                    const SizedBox(height: 20),
 
-                  // Login button
-                  ElevatedButton(
-                    onPressed: () {
-                      // Show the login bottom sheet when the button is pressed
-                      _showLoginBottomSheet(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Color(0xFF007BFF),
-                      minimumSize: Size(200, 50),
+                    // Gambar ilustrasi login
+                    Image.asset(
+                      'assets/images/fotologin.png',
+                      width: 250,
+                      height: 180,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(height: 70),
+
+                    // Form Login
+                    Card(
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(15),
                       ),
-                    ),
-                    child: Text(
-                      'Login',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 10),
+                      elevation: 5,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Login',
+                              style: GoogleFonts.poppins(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
 
-                  // Wrap version text in a Container for positioning
-                  Expanded(
-                    child: Container(
-                      alignment: Alignment.bottomCenter,
-                      child: Text(
-                        'version 0.1',
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey,
-                          fontSize: 12,
+                            TextField(
+                              controller: emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                prefixIcon: const Icon(Icons.person),
+                                labelText: 'Email',
+                                hintText: 'Example@ehr.co.id',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+
+                            TextField(
+                              controller: passwordController,
+                              obscureText: _isObscure,
+                              decoration: InputDecoration(
+                                prefixIcon: const Icon(Icons.lock),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isObscure ? Icons.visibility : Icons.visibility_off,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isObscure = !_isObscure;
+                                    });
+                                  },
+                                ),
+                                labelText: 'Password',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 30),
+
+                            // Tombol Login
+                            ElevatedButton(
+                              onPressed: _isLoading ? null : _login,
+                              style: ElevatedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                backgroundColor: const Color(0xFF007BFF),
+                                minimumSize: const Size(200, 50),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: _isLoading
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : Text(
+                                      'Login',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 20),
+
+                    // Versi aplikasi
+                    Text(
+                      'version 0.1',
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ),
@@ -184,118 +238,9 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
-
-  // Function to show login bottom sheet
-  void _showLoginBottomSheet(BuildContext context) {
-  // final TextEditingController emailController = TextEditingController();
-  // final TextEditingController passwordController = TextEditingController();
-
-  bool _isObscure = true; // Password visibility state
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-    ),
-    builder: (BuildContext context) {
-      return StatefulBuilder(
-        builder: (BuildContext context, StateSetter setState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Align(
-                    alignment: Alignment.topLeft,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        'Batalkan',
-                        style: TextStyle(color: Color(0xFF007BFF)),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Login',
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  TextField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.person),
-                      labelText: 'Email',
-                      hintText: 'Example@ehr.co.id',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 15),
-                  TextField(
-                    controller: passwordController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.lock),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isObscure ? Icons.visibility : Icons.visibility_off,
-                        ),
-                        onPressed: () => setState(() {
-                          _isObscure = !_isObscure;
-                        }),
-                      ),
-                      labelText: 'Password',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 30),
-                  ElevatedButton(
-                  onPressed: _login, // Panggil fungsi login di sini
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: const Color(0xFF007BFF),
-                    minimumSize: const Size(200, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(
-                          color: Colors.white,
-                        )
-                      : Text(
-                          'Login',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-                  SizedBox(height: 20),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    },
-  );
 }
-}
+
+
 
 
 // Custom clipper for the curved background shape

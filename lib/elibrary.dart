@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:kpi/api/api.dart';
+import 'package:ehr_report/api/api.dart';
 
 class ElibraryApp extends StatefulWidget {
   const ElibraryApp({Key? key}) : super(key: key);
@@ -225,52 +225,72 @@ class _ElibraryAppState extends State<ElibraryApp> {
                     Expanded(
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
-                        child: SingleChildScrollView(  // Menambahkan satu level SingleChildScrollView
-                          child: Table(
-                            border: TableBorder.all(color: Colors.grey),
-                            columnWidths: const {
-                              0: FixedColumnWidth(40),
-                              1: FixedColumnWidth(100),
-                              2: FixedColumnWidth(100),
-                              3: FixedColumnWidth(100),
-                            },
-                            children: [
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.grey),
-                                children: [
-                                  tableCell('No', isHeader: true),
-                                  tableCell('Nama', isHeader: true),
-                                  tableCell('Tanggal Akses', isHeader: true),
-                                  tableCell('Detail', isHeader: true),
-                                ],
-                              ),
-                              ...paginatedLibraryData.asMap().entries.map((entry) {
-                                int index = entry.key + 1;
-                                Employee employee = entry.value;
-                                return TableRow(
+                        child: SingleChildScrollView(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 10,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Table(
+                              border: TableBorder.all(color: Colors.grey.shade300, width: 1.5),
+                              columnWidths: const {
+                                0: FixedColumnWidth(40),
+                                1: FixedColumnWidth(120),
+                                2: FixedColumnWidth(120),
+                                3: FixedColumnWidth(100),
+                              },
+                              children: [
+                                TableRow(
+                                  decoration: BoxDecoration(
+                                    color: Colors.blueAccent.shade100,
+                                    borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                                  ),
                                   children: [
-                                    tableCell(index.toString()),
-                                    tableCell(employee.nama),
-                                    tableCell(_formatDate(employee.created_at)),
-                                    tableCellWithIcon(
-                                      Icons.document_scanner_outlined,
-                                      () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => DetailPage(employee: employee),
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                    tableCell('No', isHeader: true),
+                                    tableCell('Nama', isHeader: true),
+                                    tableCell('Tanggal Akses', isHeader: true),
+                                    tableCell('Detail', isHeader: true),
                                   ],
-                                );
-                              }).toList(),
-                            ],
+                                ),
+                                ...paginatedLibraryData.asMap().entries.map((entry) {
+                                  int index = entry.key + 1;
+                                  Employee employee = entry.value;
+                                  return TableRow(
+                                    decoration: BoxDecoration(
+                                      color: index.isEven ? Colors.grey.shade100 : Colors.white,
+                                    ),
+                                    children: [
+                                      tableCell(index.toString()),
+                                      tableCell(employee.nama),
+                                      tableCell(_formatDate(employee.created_at)),
+                                      tableCellWithIcon(
+                                        Icons.document_scanner_outlined,
+                                        () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => DetailPage(employee: employee),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
+
 
 
                     Row(
@@ -458,28 +478,32 @@ class DetailPage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             // Menampilkan buku yang dipinjam oleh karyawan
-            Table(
-          border: TableBorder.all(color: Colors.grey),
-          columnWidths: const {
-            0: FractionColumnWidth(0.11), // Untuk kolom "No"
-            1: FractionColumnWidth(0.89), // Untuk kolom "Nama Buku"
-          },
-          children: [
-            TableRow(
-              decoration: BoxDecoration(color: Colors.blue[50]),
-              children: [
-                tableCell('No', isHeader: true),
-                tableCell('Nama Buku', isHeader: true),
-              ],
+            Expanded(
+              child: Table(
+                border: TableBorder.all(color: Colors.grey.shade300, width: 1.5),
+                columnWidths: const {
+                0: FractionColumnWidth(0.11), // Untuk kolom "No"
+                1: FractionColumnWidth(0.89), // Untuk kolom "Nama Buku"
+                },
+                children: [
+              TableRow(
+                decoration: BoxDecoration(color: Colors.blueAccent.shade100,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
+                children: [
+                  tableCell('No', isHeader: true),
+                  tableCell('Nama Buku', isHeader: true),
+                ],
+              ),
+              TableRow(
+                decoration: BoxDecoration(),
+                children: [
+                  tableCell('1'),
+                  tableCell(employee.namaBuku), // Nama buku yang dipinjam
+                ],
+              ),
+                        ],
+                      ),
             ),
-            TableRow(
-              children: [
-                tableCell('1'),
-                tableCell(employee.namaBuku), // Nama buku yang dipinjam
-              ],
-            ),
-          ],
-        ),
 
           ],
         ),

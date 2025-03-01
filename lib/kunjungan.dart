@@ -1,9 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
-import 'package:kpi/api/api.dart';
+import 'package:ehr_report/api/api.dart';
 
 class KunjunganScreen extends StatefulWidget {
   const KunjunganScreen({required this.prevPage, Key? key}) : super(key: key);
@@ -122,7 +123,9 @@ class _KunjunganScreenState extends State<KunjunganScreen> with SingleTickerProv
         const SizedBox(height: 10),
         Expanded(
           child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
             child: DataTable(
                showCheckboxColumn: false,
               columns: const [
@@ -172,6 +175,7 @@ class _KunjunganScreenState extends State<KunjunganScreen> with SingleTickerProv
             ),
           ),
         ),
+        )
       ],
     ),
   );
@@ -321,41 +325,41 @@ body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: Padding(
-                padding: EdgeInsets.all(10),
-                child: DataTableTheme(
-                  data: DataTableThemeData(
-                    headingRowColor: MaterialStateColor.resolveWith((states) => Colors.blue), // Warna header
-                    headingTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // Warna teks header
-                  ),
-                  
-                  child: DataTable(
-                    border: TableBorder.all(
-                      color: Colors.black,
-                      width: 1,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: Padding(
+                  padding: EdgeInsets.all(10),
+                  child: DataTableTheme(
+                    data: DataTableThemeData(
+                      headingRowColor: MaterialStateColor.resolveWith((states) => Colors.blue), // Warna header
+                      headingTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // Warna teks header
                     ),
-                    columns: const [
-                      DataColumn(label: Text('No')),
-                      DataColumn(label: Text('Nama')),
-                      DataColumn(label: Text('Kolektibilitas')),
-                      DataColumn(label: Text('Pokok')),
-                      DataColumn(label: Text('Bunga')),
-                      DataColumn(label: Text('Denda')),
-                      DataColumn(label: Text('Total Tagihan')),
-                    ],
-                   rows: nasabahList.asMap().entries.map((entry) {
-                    final int index = entry.key;
-                    final nasabah = entry.value;
-                      return DataRow(cells: [
-                        DataCell(Text((index + 1).toString())),
-                        DataCell(Text(nasabah.nama)),
-                        DataCell(Text(nasabah.kolektibilitas)),
-                        DataCell(Text(nasabah.formatRupiah(nasabah.pokok).toString())),
-                        DataCell(Text(nasabah.formatRupiah(nasabah.bunga).toString())),
-                        DataCell(Text(nasabah.formatRupiah(nasabah.denda).toString())),
-                        DataCell(Text(nasabah.formatRupiah(nasabah.totalTagihan).toString())),
-                      ]);
-                    }).toList(),
+                    
+                    child: DataTable(
+                       border: TableBorder.all(color: Colors.grey.shade300, width: 1.5),
+                      columns: const [
+                        DataColumn(label: Text('No')),
+                        DataColumn(label: Text('Nama')),
+                        DataColumn(label: Text('Kolektibilitas')),
+                        DataColumn(label: Text('Pokok')),
+                        DataColumn(label: Text('Bunga')),
+                        DataColumn(label: Text('Denda')),
+                        DataColumn(label: Text('Total Tagihan')),
+                      ],
+                     rows: nasabahList.asMap().entries.map((entry) {
+                      final int index = entry.key;
+                      final nasabah = entry.value;
+                        return DataRow(cells: [
+                          DataCell(Text((index + 1).toString())),
+                          DataCell(Text(nasabah.nama)),
+                          DataCell(Text(nasabah.kolektibilitas)),
+                          DataCell(Text(nasabah.formatRupiah(nasabah.pokok).toString())),
+                          DataCell(Text(nasabah.formatRupiah(nasabah.bunga).toString())),
+                          DataCell(Text(nasabah.formatRupiah(nasabah.denda).toString())),
+                          DataCell(Text(nasabah.formatRupiah(nasabah.totalTagihan).toString())),
+                        ]);
+                      }).toList(),
+                    ),
                   ),
                 ),
               ),

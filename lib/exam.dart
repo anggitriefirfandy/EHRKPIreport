@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:kpi/api/api.dart';
+import 'package:ehr_report/api/api.dart';
 
 class ExamApp extends StatefulWidget {
   const ExamApp({Key? key}) : super(key: key);
@@ -217,21 +217,23 @@ void goToNextPage() {
               child: exams.isEmpty
                   ? const Center(child: CircularProgressIndicator()) // Indikator loading
                   : SingleChildScrollView( // Membungkus dengan SingleChildScrollView untuk scroll vertikal
-                      scrollDirection: Axis.vertical, // Tentukan arah scroll vertikal
-                      child: SingleChildScrollView( // Scroll horizontal untuk mendukung tabel lebih lebar
-                        scrollDirection: Axis.horizontal,
+                      scrollDirection: Axis.vertical,
+                      
                         child: Table(
-                          border: TableBorder.all(color: Colors.grey),
+                          border: TableBorder.all(color: Colors.grey.shade300, width: 1.5),
                           columnWidths: const {
                             0: FixedColumnWidth(40),
-                            1: FixedColumnWidth(100),
-                            2: FixedColumnWidth(100),
+                            1: FixedColumnWidth(120),
+                            2: FixedColumnWidth(120),
                             3: FixedColumnWidth(100),
                           
                           },
                           children: [
                             TableRow(
-                              decoration: BoxDecoration(color: Colors.grey),
+                              decoration: BoxDecoration(
+                                    color: Colors.blueAccent.shade100,
+                                    borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                                  ),
                               children: [
                                 tableCell('No', isHeader: true),
                                 tableCell('Nama', isHeader: true),
@@ -244,6 +246,9 @@ void goToNextPage() {
                               int index = entry.key + 1;
                               Exam exam = entry.value;
                               return TableRow(
+                                decoration: BoxDecoration(
+                                      color: index.isEven ? Colors.grey.shade100 : Colors.white,
+                                    ),
                                 children: [
                                   tableCell(index.toString()),
                                   GestureDetector(
@@ -268,7 +273,7 @@ void goToNextPage() {
                   ),
                 ),
               ),
-            ),
+            
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

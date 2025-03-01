@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:kpi/api/api.dart';
+import 'package:ehr_report/api/api.dart';
 
 class Pertumbuhankinerja extends StatefulWidget {
   final String pegawaiId;
