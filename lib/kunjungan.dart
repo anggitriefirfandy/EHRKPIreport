@@ -113,7 +113,7 @@ class _KunjunganScreenState extends State<KunjunganScreen> with SingleTickerProv
         kunjunganDataList = data.map((item) => KunjunganData.fromJson(item)).toList();
         branches = ['Semua Cabang'] + 
           kunjunganDataList.map((item) => item.kantorCabang.trim()).toSet().toList();
-
+          filteredKunjunganData = List.from(kunjunganDataList);
         // Logging daftar cabang
         debugPrint('Daftar Cabang: ${branches.join(", ")}');
         // Jika ada fitur paginasi, bisa ditambahkan perhitungan halaman di sini
@@ -166,20 +166,23 @@ void _onSearchChanged(String value) {
   List<String> branches = ['Semua Cabang'];
   void applyFilter() {
   setState(() {
-    filteredKunjunganData = kunjunganDataList.where((leave) {
-      String cleanedBranch = leave.kantorCabang.trim().toLowerCase();
-      String cleanedSelectedBranch = selectedBranch.trim().toLowerCase();
-
-      bool matchesBranch = selectedBranch == 'Semua Cabang' || cleanedBranch == cleanedSelectedBranch;
-      return matchesBranch;
-    }).toList();
-
-    // **Cek apakah selectedBranch masih ada dalam branches terbaru**
-    if (!branches.contains(selectedBranch)) {
-      selectedBranch = 'Semua Cabang'; // Reset ke default jika tidak ditemukan
+    if (selectedBranch == 'Semua Cabang') {
+      filteredKunjunganData = List.from(kunjunganDataList);
+    } else {
+      filteredKunjunganData = kunjunganDataList.where((leave) {
+        String cleanedBranch = leave.kantorCabang.trim().toLowerCase();
+        String cleanedSelectedBranch = selectedBranch.trim().toLowerCase();
+        return cleanedBranch == cleanedSelectedBranch;
+      }).toList();
     }
 
-    currentPage = 1; // Reset ke halaman pertama setelah filter diubah
+    // Jika cabang yang dipilih tidak ada dalam daftar terbaru, reset ke 'Semua Cabang'
+    if (!branches.contains(selectedBranch)) {
+      selectedBranch = 'Semua Cabang';
+    }
+
+    // Reset ke halaman pertama setelah filter berubah
+    currentPage = 1;
     totalPages = (filteredKunjunganData.length / itemsPerPage).ceil();
     updatePaginatedData();
   });
@@ -187,6 +190,7 @@ void _onSearchChanged(String value) {
   debugPrint('Selected Branch: $selectedBranch');
   debugPrint('Filtered Data Count: ${filteredKunjunganData.length}');
 }
+
 
 
 
@@ -396,7 +400,21 @@ Widget _buildDataPegawaiTab() {
               ),
             ),
           ),
-        )
+        ),
+        Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: goToPreviousPage,
+                child: const Text('Back'),
+              ),
+              Text('Page $currentPage of $totalPages'),
+              TextButton(
+                onPressed: goToNextPage,
+                child: const Text('Next'),
+              ),
+            ],
+          ),
       ],
     ),
   );
