@@ -264,6 +264,7 @@ void goToPreviousPage() {
                 },
               ),
                 ),
+                SizedBox(width: 10,),
                 Expanded(
                   child: Padding(
                                 padding: const EdgeInsets.only(bottom: 10),

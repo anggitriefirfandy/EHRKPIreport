@@ -242,6 +242,7 @@ class _LemburPageState extends State<LemburPage> {
                     },
                   ),
                 ),
+                SizedBox(width: 10,),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 10),

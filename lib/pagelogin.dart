@@ -106,7 +106,7 @@ class _LoginPageState extends State<LoginPage> {
           ClipPath(
             clipper: BackgroundClipper(),
             child: Container(
-              height: MediaQuery.of(context).size.height * 0.6,
+              height: MediaQuery.of(context).size.height * 0.5,
               color: const Color(0xFF007BFF),
             ),
           ),
@@ -118,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 10),
 
                     // Logo
                     Image.asset(

@@ -244,7 +244,7 @@ class _ElibraryAppState extends State<ElibraryApp> {
                                 0: FixedColumnWidth(40),
                                 1: FixedColumnWidth(120),
                                 2: FixedColumnWidth(120),
-                                3: FixedColumnWidth(100),
+                                3: FixedColumnWidth(80),
                               },
                               children: [
                                 TableRow(

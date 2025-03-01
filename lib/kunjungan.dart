@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -53,6 +54,14 @@ class _KunjunganScreenState extends State<KunjunganScreen> with SingleTickerProv
   late TabController _tabController;
   List<KunjunganData> kunjunganDataList = [];
   bool isLoading = true;
+  String search = "";
+  Timer? _debounce;
+  List<KunjunganData> allKunjunganData = [];
+  List<KunjunganData> filteredKunjunganData = [];
+  List<KunjunganData> paginatedKunjunganData = [];
+  int currentPage = 1;
+  final int itemsPerPage = 10; // Jumlah data per halaman
+  int totalPages = 1;
 
   @override
   void initState() {
@@ -61,26 +70,154 @@ class _KunjunganScreenState extends State<KunjunganScreen> with SingleTickerProv
     fetchKunjunganData();
   }
 
-  Future<void> fetchKunjunganData() async {
-    try {
-      setState(() => isLoading = true);
-      var response = await ApiHandler().getData('/kunjunganreport');
-      debugPrint('API Response Status Code: ${response.statusCode}');
-      debugPrint('API Response Body: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body)['data'] as List;
-        setState(() {
-          kunjunganDataList = data.map((item) => KunjunganData.fromJson(item)).toList();
-          isLoading = false;
-        });
-      } else {
-        throw Exception('Failed to fetch data.');
-      }
-    } catch (e) {
-      setState(() => isLoading = false);
-      Fluttertoast.showToast(msg: 'Error: $e');
+  // Future<void> fetchKunjunganData() async {
+  //   try {
+  //     setState(() => isLoading = true);
+  //     var response = await ApiHandler().getData('/kunjunganreport');
+  //     debugPrint('API Response Status Code: ${response.statusCode}');
+  //     debugPrint('API Response Body: ${response.body}');
+  //     if (response.statusCode == 200) {
+  //       final data = jsonDecode(response.body)['data'] as List;
+  //       setState(() {
+  //         kunjunganDataList = data.map((item) => KunjunganData.fromJson(item)).toList();
+  //         isLoading = false;
+  //       });
+  //     } else {
+  //       throw Exception('Failed to fetch data.');
+  //     }
+  //   } catch (e) {
+  //     setState(() => isLoading = false);
+  //     Fluttertoast.showToast(msg: 'Error: $e');
+  //   }
+  // }
+  Future<void> fetchKunjunganData({String? query}) async {
+  try {
+    setState(() => isLoading = true);
+
+    String url = '/kunjunganreport';
+    if (query != null && query.isNotEmpty) {
+      url += '?search=$query';
+    }
+
+    var response = await ApiHandler().getData(url);
+    debugPrint('API Response Status Code: ${response.statusCode}');
+    debugPrint('API Response Body: ${response.body}');
+
+    if (response.statusCode == 200 && response.body != null) {
+      final jsonResponse = jsonDecode(response.body);
+      final List<dynamic> data = (jsonResponse is Map<String, dynamic> && jsonResponse.containsKey('data'))
+          ? jsonResponse['data']
+          : (jsonResponse is List ? jsonResponse : []);
+
+      setState(() {
+        kunjunganDataList = data.map((item) => KunjunganData.fromJson(item)).toList();
+        branches = ['Semua Cabang'] + 
+          kunjunganDataList.map((item) => item.kantorCabang.trim()).toSet().toList();
+
+        // Logging daftar cabang
+        debugPrint('Daftar Cabang: ${branches.join(", ")}');
+        // Jika ada fitur paginasi, bisa ditambahkan perhitungan halaman di sini
+        totalPages = (kunjunganDataList.length / itemsPerPage).ceil();
+
+        isLoading = false;
+        updatePaginatedData(); // Jika ada fitur paginasi
+      });
+
+    } else {
+      throw Exception('Failed to fetch data.');
+    }
+  } catch (e) {
+    setState(() => isLoading = false);
+    Fluttertoast.showToast(msg: 'Error: $e');
+  }
+}
+void _onSearchChanged(String value) {
+  if (_debounce?.isActive ?? false) _debounce!.cancel();
+  
+  _debounce = Timer(const Duration(milliseconds: 500), () {
+    setState(() {
+      search = value;
+
+      // Pencarian hanya di cabang yang sudah difilter sebelumnya
+      filteredKunjunganData = kunjunganDataList.where((item) {
+        bool matchesBranch = selectedBranch == 'Semua Cabang' || 
+          item.kantorCabang.trim().toLowerCase() == selectedBranch.trim().toLowerCase();
+        
+        bool matchesSearch = item.nama.toLowerCase().contains(value.toLowerCase());
+        
+        return matchesBranch && matchesSearch;
+      }).toList();
+
+      currentPage = 1;
+      totalPages = (filteredKunjunganData.length / itemsPerPage).ceil();
+      updatePaginatedData();
+    });
+
+    debugPrint('Search Query: $value');
+    debugPrint('Filtered Data Count: ${filteredKunjunganData.length}');
+  });
+}
+@override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+  String selectedBranch = 'Semua Cabang';
+  List<String> branches = ['Semua Cabang'];
+  void applyFilter() {
+  setState(() {
+    filteredKunjunganData = kunjunganDataList.where((leave) {
+      String cleanedBranch = leave.kantorCabang.trim().toLowerCase();
+      String cleanedSelectedBranch = selectedBranch.trim().toLowerCase();
+
+      bool matchesBranch = selectedBranch == 'Semua Cabang' || cleanedBranch == cleanedSelectedBranch;
+      return matchesBranch;
+    }).toList();
+
+    // **Cek apakah selectedBranch masih ada dalam branches terbaru**
+    if (!branches.contains(selectedBranch)) {
+      selectedBranch = 'Semua Cabang'; // Reset ke default jika tidak ditemukan
+    }
+
+    currentPage = 1; // Reset ke halaman pertama setelah filter diubah
+    totalPages = (filteredKunjunganData.length / itemsPerPage).ceil();
+    updatePaginatedData();
+  });
+
+  debugPrint('Selected Branch: $selectedBranch');
+  debugPrint('Filtered Data Count: ${filteredKunjunganData.length}');
+}
+
+
+
+  void updatePaginatedData() {
+    int startIndex = (currentPage - 1) * itemsPerPage;
+    int endIndex = startIndex + itemsPerPage;
+
+    setState(() {
+      paginatedKunjunganData =
+          filteredKunjunganData.sublist(startIndex, endIndex.clamp(0, filteredKunjunganData.length));
+    });
+  }
+
+  void goToNextPage() {
+    if (currentPage < totalPages) {
+      setState(() {
+        currentPage++;
+        updatePaginatedData();
+      });
     }
   }
+
+  void goToPreviousPage() {
+    if (currentPage > 1) {
+      setState(() {
+        currentPage--;
+        updatePaginatedData();
+      });
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -114,11 +251,95 @@ class _KunjunganScreenState extends State<KunjunganScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildDataPegawaiTab() {
+//   Widget _buildDataPegawaiTab() {
+//   return Padding(
+//     padding: const EdgeInsets.all(16.0),
+//     child: Column(
+//       children: [
+//         const Text("Data Pegawai", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+//         const SizedBox(height: 10),
+//         Expanded(
+//           child: SingleChildScrollView(
+//             scrollDirection: Axis.vertical,
+//             child: SingleChildScrollView(
+//               scrollDirection: Axis.horizontal,
+//             child: DataTable(
+//                showCheckboxColumn: false,
+//               columns: const [
+//                 DataColumn(label: Text("Foto")),
+//                 DataColumn(label: Text("Nama")),
+//                 DataColumn(label: Text("Funding (%)")),
+//                 DataColumn(label: Text("Lending (%)")),
+//                 DataColumn(label: Text("Collection (%)")),
+//                 DataColumn(label: Text("Total Kunjungan")),
+//               ],
+//               rows: kunjunganDataList.map((data) {
+//                 double fundingPercent = (data.totalKunjungan > 0) ? (data.funding / data.totalKunjungan * 100) : 0;
+//                 double lendingPercent = (data.totalKunjungan > 0) ? (data.lending / data.totalKunjungan * 100) : 0;
+//                 double collectionPercent = (data.totalKunjungan > 0) ? (data.collection / data.totalKunjungan * 100) : 0;
+
+//                 return DataRow(
+//                   onSelectChanged: (selected) {
+//                     if (selected == true) {
+//                       Navigator.push(
+//                         context,
+//                         MaterialPageRoute(
+//                           builder: (context) => DetailKunjunganPage(
+//                             pegawaiId: data.pegawaiId,
+//                           ),
+//                         ),
+//                       );
+//                     }
+//                   },
+//                   cells: [
+//                     DataCell(
+//                       Image.network(
+//                         data.profil,
+//                         width: 50,
+//                         height: 50,
+//                         fit: BoxFit.cover,
+//                         errorBuilder: (_, __, ___) => const Icon(Icons.error),
+//                       ),
+//                     ),
+//                     DataCell(Text(data.nama)),
+//                     DataCell(_buildProgressIndicator(fundingPercent, Colors.green)),
+//                     DataCell(_buildProgressIndicator(lendingPercent, Colors.blue)),
+//                     DataCell(_buildProgressIndicator(collectionPercent, Colors.orange)),
+//                     DataCell(Text(data.totalKunjungan.toString())),
+//                   ],
+//                 );
+//               }).toList(),
+//             ),
+//           ),
+//         ),
+//         )
+//       ],
+//     ),
+//   );
+// }
+Widget _buildDataPegawaiTab() {
   return Padding(
     padding: const EdgeInsets.all(16.0),
     child: Column(
       children: [
+        SizedBox(
+          child: DropdownButton<String>(
+            value: selectedBranch,
+            isExpanded: true,
+            items: branches.map((branch) {
+              return DropdownMenuItem(
+                value: branch,
+                child: Text(branch),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                selectedBranch = value!;
+                applyFilter();
+              });
+            },
+          ),
+        ),
         const Text("Data Pegawai", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         Expanded(
@@ -126,60 +347,61 @@ class _KunjunganScreenState extends State<KunjunganScreen> with SingleTickerProv
             scrollDirection: Axis.vertical,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-            child: DataTable(
-               showCheckboxColumn: false,
-              columns: const [
-                DataColumn(label: Text("Foto")),
-                DataColumn(label: Text("Nama")),
-                DataColumn(label: Text("Funding (%)")),
-                DataColumn(label: Text("Lending (%)")),
-                DataColumn(label: Text("Collection (%)")),
-                DataColumn(label: Text("Total Kunjungan")),
-              ],
-              rows: kunjunganDataList.map((data) {
-                double fundingPercent = (data.totalKunjungan > 0) ? (data.funding / data.totalKunjungan * 100) : 0;
-                double lendingPercent = (data.totalKunjungan > 0) ? (data.lending / data.totalKunjungan * 100) : 0;
-                double collectionPercent = (data.totalKunjungan > 0) ? (data.collection / data.totalKunjungan * 100) : 0;
+              child: DataTable(
+                showCheckboxColumn: false,
+                columns: const [
+                  DataColumn(label: Text("Foto")),
+                  DataColumn(label: Text("Nama")),
+                  DataColumn(label: Text("Funding (%)")),
+                  DataColumn(label: Text("Lending (%)")),
+                  DataColumn(label: Text("Collection (%)")),
+                  DataColumn(label: Text("Total Kunjungan")),
+                ],
+                rows: paginatedKunjunganData.map((data) {
+                  double fundingPercent = (data.totalKunjungan > 0) ? (data.funding / data.totalKunjungan * 100) : 0;
+                  double lendingPercent = (data.totalKunjungan > 0) ? (data.lending / data.totalKunjungan * 100) : 0;
+                  double collectionPercent = (data.totalKunjungan > 0) ? (data.collection / data.totalKunjungan * 100) : 0;
 
-                return DataRow(
-                  onSelectChanged: (selected) {
-                    if (selected == true) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DetailKunjunganPage(
-                            pegawaiId: data.pegawaiId,
+                  return DataRow(
+                    onSelectChanged: (selected) {
+                      if (selected == true) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DetailKunjunganPage(
+                              pegawaiId: data.pegawaiId,
+                            ),
                           ),
+                        );
+                      }
+                    },
+                    cells: [
+                      DataCell(
+                        Image.network(
+                          data.profil,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.error),
                         ),
-                      );
-                    }
-                  },
-                  cells: [
-                    DataCell(
-                      Image.network(
-                        data.profil,
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.error),
                       ),
-                    ),
-                    DataCell(Text(data.nama)),
-                    DataCell(_buildProgressIndicator(fundingPercent, Colors.green)),
-                    DataCell(_buildProgressIndicator(lendingPercent, Colors.blue)),
-                    DataCell(_buildProgressIndicator(collectionPercent, Colors.orange)),
-                    DataCell(Text(data.totalKunjungan.toString())),
-                  ],
-                );
-              }).toList(),
+                      DataCell(Text(data.nama)),
+                      DataCell(_buildProgressIndicator(fundingPercent, Colors.green)),
+                      DataCell(_buildProgressIndicator(lendingPercent, Colors.blue)),
+                      DataCell(_buildProgressIndicator(collectionPercent, Colors.orange)),
+                      DataCell(Text(data.totalKunjungan.toString())),
+                    ],
+                  );
+                }).toList(),
+              ),
             ),
           ),
-        ),
         )
       ],
     ),
   );
 }
+
 
 Widget _buildProgressIndicator(double percent, Color color) {
   return Padding(

@@ -215,7 +215,11 @@ void goToNextPage() {
           const SizedBox(height: 16),
           Expanded(
               child: exams.isEmpty
-                  ? const Center(child: CircularProgressIndicator()) // Indikator loading
+                  ? const Center(child: Text(
+                    "Data Kosong",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  ) // Indikator loading
                   : SingleChildScrollView( // Membungkus dengan SingleChildScrollView untuk scroll vertikal
                       scrollDirection: Axis.vertical,
                       
