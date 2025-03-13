@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:kpi/api/api.dart';
+import 'package:ehr_report/api/api.dart';
 
 class AbsensiPage extends StatefulWidget {
   const AbsensiPage({required this.prevPage, super.key});
@@ -54,6 +54,12 @@ class _AbsensiPageState extends State<AbsensiPage> {
   bool isLoading = true;
   String search = "";
   Timer? _debounce;
+  List<AbsensiData> allAbsensiData = [];
+  List<AbsensiData> filteredAbsensiData = [];
+  List<AbsensiData> paginatedAbsensiData = [];
+  int currentPage = 1;
+  final int itemsPerPage = 10; // Jumlah data per halaman
+  int totalPages = 1;
   @override
   void initState() {
     super.initState();
@@ -61,61 +67,148 @@ class _AbsensiPageState extends State<AbsensiPage> {
   }
 
   Future<void> fetchAbsensiData({String? query}) async {
-    try {
-      setState(() {
-        isLoading = true; // Set loading true saat mulai mengambil data
-      });
-
-      var url = '/absensireport';
-      if (query != null && query.isNotEmpty) {
-        url += '?search=$query';
-      }
-      var dat = await ApiHandler().getData(url);
-      debugPrint('API Response Status Code: ${dat.statusCode}');
-      debugPrint('API Response Body: ${dat.body}');
-      if (dat.statusCode == 200 && dat.body != null) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
-        
-        if (jsonResponse.containsKey('data') && jsonResponse['data'] is List) {
-          final List<dynamic> data = jsonResponse['data'];
-          List<AbsensiData> tempList = 
-              data.map((item) => AbsensiData.fromJson(item)).toList();
-
-          setState(() {
-            absensiDataList = tempList; // Simpan data ke variabel
-            isLoading = false; // Set loading false setelah data didapat
-          });
-        } else {
-          throw Exception('Invalid data format');
-        }
-      } else {
-        throw Exception('Failed to fetch data. Status code: ${dat.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        isLoading = false; // Set loading false jika ada error
-      });
-      Fluttertoast.showToast(msg: 'Error: $e');
-    }
-  }
-  void _onSearchChanged(String value) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      fetchAbsensiData(query: value);
+  try {
+    setState(() {
+      isLoading = true;
     });
 
+    String url = '/absensireport';
+    if (query != null && query.isNotEmpty) {
+      url += '?search=$query';
+    }
+
+    var dat = await ApiHandler().getData(url);
+    debugPrint('API Response Status Code: ${dat.statusCode}');
+    debugPrint('API Response body: ${dat.body}');
+    if (dat.statusCode == 200 && dat.body != null) {
+      final dynamic jsonResponse = jsonDecode(dat.body);
+      List<dynamic> data = jsonResponse is Map<String, dynamic> && jsonResponse.containsKey('data')
+          ? jsonResponse['data']
+          : (jsonResponse is List ? jsonResponse : []);
+
+      final branchSet = <String>{'Semua Cabang'};
+      for (var item in data) {
+        var absensiData = AbsensiData.fromJson(item);
+        if (absensiData.cabang != null && absensiData.cabang!.trim().isNotEmpty) {
+          branchSet.add(absensiData.cabang!);
+        }
+      }
+
+      setState(() {
+  absensiDataList = data.map((item) => AbsensiData.fromJson(item)).toList();
+  filteredAbsensiData = List.from(absensiDataList);
+
+  branches = branchSet.where((branch) => branch.isNotEmpty).toList();
+
+  // Pastikan selectedBranch ada di daftar branches
+  if (!branches.contains(selectedBranch)) {
+    selectedBranch = branches.isNotEmpty ? branches.first : 'Semua Cabang';
+  }
+
+  totalPages = (filteredAbsensiData.length / itemsPerPage).ceil();
+  isLoading = false;
+  updatePaginatedData();
+});
+
+    } else {
+      throw Exception('Failed to fetch data');
+    }
+  } catch (e) {
+    setState(() {
+      isLoading = false;
+    });
+    Fluttertoast.showToast(msg: 'Error: $e');
+  }
+}
+
+void _onSearchChanged(String value) {
+  if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+  _debounce = Timer(const Duration(milliseconds: 500), () {
     setState(() {
       search = value;
+      filteredAbsensiData = absensiDataList.where((item) {
+        bool matchesBranch = selectedBranch == 'Semua Cabang' ||
+            item.cabang.trim().toLowerCase() == selectedBranch.trim().toLowerCase();
+        bool matchesSearch = item.nama.toLowerCase().contains(value.toLowerCase());
+        return matchesBranch && matchesSearch;
+      }).toList();
+
+      currentPage = 1;
+      totalPages = (filteredAbsensiData.length / itemsPerPage).ceil();
+      updatePaginatedData();
     });
-  }
-  @override
+  });
+}
+ @override
   void dispose() {
     _debounce?.cancel();
     super.dispose();
   }
+ String selectedBranch = 'Semua Cabang';
+  List<String> branches = ['Semua Cabang'];
+
+void applyFilter() {
+  setState(() {
+    filteredAbsensiData = absensiDataList.where((item) {
+      String cleanedBranch = item.cabang.trim().toLowerCase();
+      String cleanedSelectedBranch = selectedBranch.trim().toLowerCase();
+      bool matchesBranch = selectedBranch == 'Semua Cabang' || cleanedBranch == cleanedSelectedBranch;
+      return matchesBranch;
+    }).toList();
+
+    if (!branches.contains(selectedBranch)) {
+      selectedBranch = 'Semua Cabang';
+    }
+
+    currentPage = 1;
+    totalPages = (filteredAbsensiData.length / itemsPerPage).ceil();
+    updatePaginatedData();
+  });
+  debugPrint('Selected Branch: $selectedBranch');
+  debugPrint('Filtered Data Count: ${filteredAbsensiData.length}');
+}
+
+void updatePaginatedData() {
+  int startIndex = (currentPage - 1) * itemsPerPage;
+  int endIndex = startIndex + itemsPerPage;
+  debugPrint('Total Pages: $totalPages');
+  debugPrint('Current Page: $currentPage');
+  debugPrint('Filtered Absensi Data Count: ${filteredAbsensiData.length}');
+  debugPrint('Paginated Absensi Data Count: ${paginatedAbsensiData.length}');
+
+
+  setState(() {
+    paginatedAbsensiData =
+        filteredAbsensiData.sublist(startIndex, endIndex.clamp(0, filteredAbsensiData.length));
+        debugPrint('Total Pages: $totalPages');
+        debugPrint('Current Page: $currentPage');
+        debugPrint('Filtered Absensi Data Count: ${filteredAbsensiData.length}');
+        debugPrint('Paginated Absensi Data Count: ${paginatedAbsensiData.length}');
+
+  });
+}
+
+void goToNextPage() {
+  if (currentPage < totalPages) {
+    setState(() {
+      currentPage++;
+      updatePaginatedData();
+    });
+  }
+}
+
+void goToPreviousPage() {
+  if (currentPage > 1) {
+    setState(() {
+      currentPage--;
+      updatePaginatedData();
+    });
+  }
+}
   @override
   Widget build(BuildContext context) {
+    // return Container();
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -142,83 +235,91 @@ class _AbsensiPageState extends State<AbsensiPage> {
           },
         ),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
+      body: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: TextField(
+             Padding(padding: EdgeInsets.all(10),
+             child: Row(
+              children: [
+                Expanded(
+                   child: DropdownButton<String>(
+                value: branches.contains(selectedBranch) ? selectedBranch : (branches.isNotEmpty ? branches.first : null),
+                isExpanded: true,
+                hint: Text("Pilih Cabang"),
+                items: branches.map((branch) {
+                  return DropdownMenuItem(
+                    value: branch,
+                    child: Text(branch),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      selectedBranch = value;
+                      applyFilter();
+                    });
+                  }
+                },
+              ),
+                ),
+                SizedBox(width: 10,),
+                Expanded(
+                  child: Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: TextField(
                   onChanged: _onSearchChanged, // Panggil otomatis saat mengetik
                   decoration: InputDecoration(
-                    labelText: "Search berdasarkan nama",
+                    labelText: "Masukan Nama",
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15.0),
                     ),
-                    suffixIcon: Icon(Icons.search),
+                   
                   ),
+                                ),
+                              ),
                 ),
-              ),
-              SizedBox(height: 16),
-              SizedBox(
-                height: 700,
+
+              ],
+             )
+             
+            ),
+
+              Expanded(
                 child: isLoading
-                    ? Center(child: CircularProgressIndicator())
+                    ? const Center(child: CircularProgressIndicator())
                     : absensiDataList.isEmpty
-                        ? Center(child: Text('No data found.'))
+                        ? const Center(child: Text('No data found.'))
                         : ListView.builder(
-                            itemCount: absensiDataList.length,
+                            itemCount: paginatedAbsensiData.length,
                             itemBuilder: (context, index) {
-                              final absensi = absensiDataList[index];
+                              final absensi = paginatedAbsensiData[index];
+                              // final absensi = paginatedAbsensiData[index];
                               return AbsensiCard(absensi: absensi);
                             },
                           ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: 10),
-                  // Padding(
-                  //   padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  //   child: Text(
-                  //     'Presentase Absensi',
-                  //     style: TextStyle(
-                  //       fontSize: 14,
-                  //       fontWeight: FontWeight.bold,
-                  //       color: Colors.black,
-                  //     ),
-                  //   ),
-                  // ),
-                  SizedBox(height: 50),
-                  // SizedBox(
-                  //   height: 200,
-                  //   child: AttendanceChart(),
-                  // ),
-                  // SizedBox(height: 16),
-                  // Padding(
-                  //   padding: const EdgeInsets.all(8.0),
-                  //   child: Row(
-                  //     mainAxisAlignment: MainAxisAlignment.center,
-                  //     children: [
-                  //       LegendIndicator(color: Colors.green, text: 'Hadir'),
-                  //       SizedBox(width: 16),
-                  //       LegendIndicator(color: Colors.yellow, text: 'Terlambat'),
-                  //       SizedBox(width: 16),
-                  //       LegendIndicator(color: Colors.red, text: 'Tidak Hadir'),
-                  //     ],
-                  //   ),
-                  // ),
-                ],
+              Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: goToPreviousPage,
+                child: const Text('Back'),
+              ),
+              Text('Page $currentPage of $totalPages'),
+              TextButton(
+                onPressed: goToNextPage,
+                child: const Text('Next'),
               ),
             ],
           ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
   }
-}
+} 
 
 class AbsensiCard extends StatelessWidget {
   final AbsensiData absensi;

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:kpi/api/api.dart';
+import 'package:ehr_report/api/api.dart';
 
 class Widgethalamanutama extends StatefulWidget {
   const Widgethalamanutama({super.key});
@@ -37,6 +37,10 @@ class _WidgethalamanutamaState extends State<Widgethalamanutama> {
                       'total_pegawai': item['total_pegawai'],
                       'total_absen_hari_ini': item['total_absen_hari_ini'],
                       'total_terlambat': item['total_terlambat'],
+                      'total_pegawai_laki': item['total_pegawai_laki'],
+                      'total_pegawai_perempuan': item['total_pegawai_perempuan'],
+                      'total_absen_kemarin': item ['total_absen_kemarin'],
+                      'total_terlambat_kemarin': item ['total_terlambat_kemarin'],
                     })
                 .toList();
                

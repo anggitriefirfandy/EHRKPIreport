@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -5,10 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:kpi/api/api.dart';
+import 'package:ehr_report/api/api.dart';
 import 'package:http/http.dart' as http;
-import 'package:kpi/widget/tablecuti.dart';
-import 'package:kpi/widget/widgetcuti.dart';
+import 'package:ehr_report/widget/tablecuti.dart';
+import 'package:ehr_report/widget/widgetcuti.dart';
 
 class EmployeeLeavePage extends StatefulWidget {
   const EmployeeLeavePage({required this.prevPage, super.key});
@@ -20,42 +21,36 @@ class EmployeeLeavePage extends StatefulWidget {
 
 class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
   late Future<List<LeaveData>> futureLeaveData;
+  List<LeaveData> leaveDataList = [];
   List<LeaveData> allLeaveData = [];
   List<LeaveData> filteredLeaveData = [];
   List<LeaveData> paginatedLeaveData = [];
   int currentPage = 1;
   final int itemsPerPage = 10; // Jumlah data per halaman
   int totalPages = 1;
+  bool isLoading = true;
+  Timer? _debounce;
+  String search = "";
 
   String selectedBranch = 'Semua Cabang'; // Default pilihan cabang
   String selectedMonth = 'Semua Bulan'; // Default pilihan bulan
   List<String> branches = ['Semua Cabang']; // Default cabang
-  final List<String> months = [
-    'Semua Bulan',
-    'Januari',
-    'Februari',
-    'Maret',
-    'April',
-    'Mei',
-    'Juni',
-    'Juli',
-    'Agustus',
-    'September',
-    'Oktober',
-    'November',
-    'Desember'
-  ];
+  
 
   @override
   void initState() {
     super.initState();
     futureLeaveData = getDataCuti();
   } 
-  Future<List<LeaveData>> getDataCuti() async {
+  Future<List<LeaveData>> getDataCuti({String? query}) async {
   try {
-    String month = months.indexOf(selectedMonth).toString();
-    String year = DateTime.now().year.toString();
+    setState(() {
+      isLoading = true;
+    });
     var url = '/cutireport';
+    if (query != null && query.isNotEmpty) {
+      url += '?search=$query';
+    }
     
     var dat = await ApiHandler().getData(url);
 
@@ -90,13 +85,47 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
       throw Exception('Failed to fetch leave data. Status code: ${dat.statusCode}');
     }
   } catch (e) {
+    setState(() {
+      isLoading = false;
+    });
     Fluttertoast.showToast(msg: 'Error: $e');
     return [];
   }
 }
 
+void _onSearchChanged(String value) {
+  if (_debounce?.isActive ?? false) _debounce!.cancel();
 
+  _debounce = Timer(const Duration(milliseconds: 500), () {
+    setState(() {
+      search = value;
+      
+      if (value.isEmpty) {
+        // Jika input kosong, kembalikan ke semua data yang difilter
+        filteredLeaveData = allLeaveData.where((leave) {
+          return selectedBranch == 'Semua Cabang' || leave.kantorCabang == selectedBranch;
+        }).toList();
+      } else {
+        // Filter berdasarkan nama dan cabang yang dipilih
+        filteredLeaveData = allLeaveData.where((item) {
+          bool matchesBranch = selectedBranch == 'Semua Cabang' ||
+              item.kantorCabang.trim().toLowerCase() == selectedBranch.trim().toLowerCase();
+          bool matchesSearch = item.nama.toLowerCase().contains(value.toLowerCase());
+          return matchesBranch && matchesSearch;
+        }).toList();
+      }
 
+      currentPage = 1;
+      totalPages = (filteredLeaveData.length / itemsPerPage).ceil();
+      updatePaginatedData();
+    });
+  });
+}
+@override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
 
   void applyFilter() {
     setState(() {
@@ -182,28 +211,47 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                // Expanded(
-                //   child: DropdownButton<String>(
-                //     value: selectedMonth,
-                //     isExpanded: true,
-                //     items: months.map((month) {
-                //       return DropdownMenuItem(
-                //         value: month,
-                //         child: Text(month),
-                //       );
-                //     }).toList(),
-                //     onChanged: (value) {
-                //       setState(() {
-                //         selectedMonth = value!;
-                //         applyFilter(); // Panggil applyFilter untuk memperbarui data berdasarkan bulan yang dipilih
-                //       });
-                //     },
-                //   )
-
-                // ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: TextField(
+                    onChanged: _onSearchChanged, // Panggil otomatis saat mengetik
+                    decoration: InputDecoration(
+                      labelText: "Masukan Nama",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15.0),
+                      ),
+                    
+                    ),
+                    ),
+                  ),
+                ),
+              
               ],
             ),
           ),
+          // Expanded(
+          //   child: FutureBuilder<List<LeaveData>>(
+          //     future: futureLeaveData,
+          //     builder: (context, snapshot) {
+          //       if (snapshot.connectionState == ConnectionState.waiting) {
+          //         return const Center(child: CircularProgressIndicator());
+          //       } else if (snapshot.hasError) {
+          //         return Center(child: Text('Error: ${snapshot.error}'));
+          //       } else {
+          //         return paginatedLeaveData.isEmpty
+          //             ? const Center(child: Text('No data found.'))
+          //             : ListView.builder(
+          //                 itemCount: paginatedLeaveData.length,
+          //                 itemBuilder: (context, index) {
+          //                   final employee = paginatedLeaveData[index];
+          //                   return EmployeeCard(employee: employee);
+          //                 },
+          //               );
+          //       }
+          //     },
+          //   ),
+          // ),
           Expanded(
             child: FutureBuilder<List<LeaveData>>(
               future: futureLeaveData,
@@ -226,6 +274,7 @@ class _EmployeeLeavePageState extends State<EmployeeLeavePage> {
               },
             ),
           ),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

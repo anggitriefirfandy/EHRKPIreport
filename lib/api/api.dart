@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:developer';
-import 'package:kpi/pagelogin.dart';
+import 'package:ehr_report/pagelogin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:platform_device_id/platform_device_id.dart';
+// import 'package:platform_device_id/platform_device_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -15,7 +15,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
-
 
 class ApiHandler {
   String _apiurl = 'https://your.domainnamegoeshere.xyz/api/ehrreport';
@@ -45,6 +44,7 @@ class ApiHandler {
       } catch (e) {}
     }
   }
+
   _getToken() async {
     print('tes gettoken');
     SharedPreferences locStor = await SharedPreferences.getInstance();
@@ -65,17 +65,18 @@ class ApiHandler {
 //   _token = '';
 //   print('Token is null or empty');
 // }
-    String? deviceId = await PlatformDeviceId.getDeviceId;
-    if (deviceId != null) {
-      _devid = deviceId;
-    }
-    final deviceInfoPlugin = DeviceInfoPlugin();
-    final deviceInfo = await deviceInfoPlugin.deviceInfo;
-    final Map allInfo = deviceInfo.data;
-    if (deviceInfo != null) {
-      _devinf = jsonEncode(allInfo);
-    }
+    // String? deviceId = await PlatformDeviceId.getDeviceId;
+    // if (deviceId != null) {
+    //   _devid = deviceId;
+    // }
+    // final deviceInfoPlugin = DeviceInfoPlugin();
+    // final deviceInfo = await deviceInfoPlugin.deviceInfo;
+    // final Map allInfo = deviceInfo.data;
+    // if (deviceInfo != null) {
+    //   _devinf = jsonEncode(allInfo);
+    // }
   }
+
   _getappver() async {
     try {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -242,6 +243,7 @@ class ApiHandler {
     }
     // Get.offAll(LoginPage());
   }
+
   postData(apiUrl, data, {bldctx = null}) async {
     print('tes postdata');
     EasyLoading.show(status: 'Loading', maskType: EasyLoadingMaskType.black);
@@ -272,6 +274,7 @@ class ApiHandler {
     }
     return res;
   }
+
   _setHeaders({String content_type = 'application/json'}) => {
         'Fltappver': _appver,
         'Deviceid': _devid,

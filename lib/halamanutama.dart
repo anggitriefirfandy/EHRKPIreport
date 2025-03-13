@@ -5,17 +5,18 @@ import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:kpi/absen.dart';
-import 'package:kpi/api/api.dart';
-import 'package:kpi/cuti.dart';
-import 'package:kpi/elibrary.dart';
-import 'package:kpi/exam.dart';
-import 'package:kpi/handler/imageNetwork.dart';
-import 'package:kpi/kpi.dart';
-import 'package:kpi/kunjungan.dart';
-import 'package:kpi/lembur.dart';
-import 'package:kpi/pagelogin.dart';
-import 'package:kpi/widget/widgethalamanutama.dart';
+import 'package:intl/intl.dart';
+import 'package:ehr_report/absen.dart';
+import 'package:ehr_report/api/api.dart';
+import 'package:ehr_report/cuti.dart';
+import 'package:ehr_report/elibrary.dart';
+import 'package:ehr_report/exam.dart';
+import 'package:ehr_report/handler/imageNetwork.dart';
+import 'package:ehr_report/kpi.dart';
+import 'package:ehr_report/kunjungan.dart';
+import 'package:ehr_report/lembur.dart';
+import 'package:ehr_report/pagelogin.dart';
+import 'package:ehr_report/widget/widgethalamanutama.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Assumed to have a login page
 
 class HomeScreen extends StatefulWidget {
@@ -39,11 +40,19 @@ class _HomeScreenState extends State<HomeScreen> {
   int totalPegawai = 0;
   int totalAbsenHariIni = 0;
   int totalTerlambat = 0;
+  int totalPerempuan = 0;
+  int totalLaki = 0;
+  int totalAbsenKemarin = 0;
+  int totalTerlambatKemarin = 0;
   String _username = '-';
+  String namaPegawai = '';
+  String nip = '';
+  String jabatan = '';
+  
   Image _profimg = Image.asset(
     'assets/images/def_img.png',
-    width: 39,
-    height: 39,
+    width: 100,
+    height: 100,
     fit: BoxFit.fill,
   );
   @override
@@ -51,7 +60,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     getuser(); // Panggil fungsi untuk memuat data pengguna
     fetchWidgetkpi();
+    fetchHalamanProfil();
   }
+
   Future<void> fetchWidgetkpi() async {
     try {
       setState(() {
@@ -70,6 +81,10 @@ class _HomeScreenState extends State<HomeScreen> {
           totalPegawai = jsonResponse['total_pegawai'] ?? 0;
           totalAbsenHariIni = jsonResponse['total_absen_hari_ini'] ?? 0;
           totalTerlambat = jsonResponse['total_terlambat'] ?? 0;
+          totalPerempuan = jsonResponse['total_pegawai_perempuan'] ?? 0;
+          totalLaki = jsonResponse['total_pegawai_laki'] ?? 0;
+          totalAbsenKemarin = jsonResponse['total_absen_kemarin'] ?? 0;
+          totalTerlambatKemarin = jsonResponse['total_terlambat_kemarin'] ?? 0;
           isLoading = false;
         });
       } else {
@@ -82,6 +97,47 @@ class _HomeScreenState extends State<HomeScreen> {
       Fluttertoast.showToast(msg: 'Error: $e');
     }
   }
+  Future<void> fetchHalamanProfil() async {
+  try {
+    setState(() {
+      isLoading = true;
+    });
+
+    var url = '/halamanprofil';
+    var dat = await ApiHandler().getData(url);
+    debugPrint('API Response profil Status Code: ${dat.statusCode}' );
+    debugPrint('API Response profil widget Body: ${dat.body}' ,wrapWidth: 2034);
+
+    if (dat.statusCode == 200 && dat.body != null) {
+      final Map<String, dynamic> jsonResponse = jsonDecode(dat.body);
+
+      if (jsonResponse.containsKey('data')) {
+        final Map<String, dynamic> data = jsonResponse['data'];
+
+        setState(() {
+          namaPegawai = data['nama'] ?? '';
+          jabatan = data['jabatan'] ?? '';
+          nip = data['nip'] ?? '';
+          isLoading = false;
+        });
+
+        debugPrint('Nama Pegawai: $namaPegawai');
+        debugPrint('nip$nip');
+        debugPrint('jabatan $jabatan');
+      } else {
+        throw Exception('Data tidak ditemukan dalam respons API');
+      }
+    } else {
+      throw Exception('Invalid data format');
+    }
+  } catch (e) {
+    setState(() {
+      isLoading = false;
+    });
+    Fluttertoast.showToast(msg: 'Error: $e');
+  }
+}
+
   
   @override
   Widget build(BuildContext context) {
@@ -107,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     // Dashboard Row with Logout Icon on the right
                     Padding(
-                      padding: const EdgeInsets.only(top: 30),
+                      padding: const EdgeInsets.only(top: 30,),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -117,6 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           //     fetchWidgetkpi(); // Panggil fungsi untuk refresh data
                           //   },
                           // ),
+                         
                           const SizedBox(width: 40),
                           IconButton(
                             icon: const Icon(Icons.logout, color: Colors.white),
@@ -130,6 +187,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
+                     Text('CV. ANUGRAH KARYA INDONESIA', style: TextStyle(
+                            color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold
+                          ),),
                     const SizedBox(height: 20),
                     // Profile Row
                     Row(
@@ -139,8 +199,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: ClipRRect(
                            borderRadius: BorderRadius.circular(50),
                            child: Container(
-                            width: 39,
-                            height: 39,
+                            width: 65,
+                            height: 65,
                             color: Colors.white,
                             child: _profimg,
                             ),
@@ -153,26 +213,44 @@ class _HomeScreenState extends State<HomeScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _username,
+                                  namaPegawai,
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 15,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
+                                Text(
+                                  jabatan,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  nip,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+
                               ],
                             ),
                           ),
                         ),
                       ],
                     ),
+                    SizedBox(height: 40,),
                   ],
                 ),
               ),
         
               // White Container with Rounded Top
               Positioned(
-                top: 220,
+                top: 230,
                 left: 0,
                 right: 0,
                 child: Container(
@@ -189,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
         
               // Menu Row Positioned to meet the white container's curve
               Positioned(
-                top: 180,
+                top: 200,
                 left: 0,
                 right: 0,
                 child: SingleChildScrollView(
@@ -240,326 +318,124 @@ class _HomeScreenState extends State<HomeScreen> {
                               fetchWidgetkpi(); // Panggil fungsi untuk refresh data
                             },
                           ),
+                          // 
                           SizedBox(
                             width: double.infinity,
-                            child: Card(
-                              elevation: 4, // Menambahkan shadow
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12), // Membuat sudut melengkung
-                              ),
-                              color: Colors.blue[100], // Warna latar belakang yang soft
-                              margin: EdgeInsets.symmetric(vertical: 10, horizontal: 20), // Memberi ruang antar card
+                            
                               child: Padding(
-                                padding: EdgeInsets.all(20), // Padding agar isi tidak terlalu mepet
+                                padding: EdgeInsets.only(top: 10),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      "Total Pegawai",
-                                      style: TextStyle(
-                                        fontSize: 20,
+                                    Text("Statistik Pegawai",  style: TextStyle(
+                                        fontSize: 22,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.blue[900], // Warna teks lebih gelap agar kontras
+                                        color: Colors.blue[900],)),
+                                    
+                                    
+                                    /// Row agar selalu 3 card dalam satu baris
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        _buildInfoCard("Total Pegawai", "$totalPegawai Orang", Icons.group, Colors.blue),
+                                        _buildInfoCard("Pegawai Pria", "$totalLaki Orang", Icons.male, Colors.blue),
+                                        _buildInfoCard("Pegawai Wanita", "$totalPerempuan Orang", Icons.female, Colors.pink),
+                                      ],
+                                    ),
+                                    SizedBox(height: 20),
+                                    Text(
+                                      "$formattedDate",
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue[900],
                                       ),
                                     ),
-                                    SizedBox(height: 8), // Jarak antar teks
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        _buildInfoCard("Total Absen", "$totalAbsenHariIni Orang", Icons.check_circle,   Colors.green,),
+                                        _buildInfoCard("Total Telat", "$totalTerlambat Orang",  Icons.warning_amber_rounded,Colors.orange,),
+                                        _buildInfoCard("Tidak Absen", "${totalPegawai - totalAbsenHariIni} Orang", Icons.cancel,  Colors.red,),
+                                      ],
+                                    ),
+                                    SizedBox(height: 20,),
                                     Text(
-                                      "$totalPegawai Orang",
+                                      "$formattedDateYesterday",
                                       style: TextStyle(
-                                        fontSize: 24, 
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87, // Warna teks utama
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue[900],
                                       ),
+                                    ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        _buildInfoCard("Total Absen", "$totalAbsenKemarin Orang", Icons.check_circle,   Colors.green,),
+                                        _buildInfoCard("Total Telat", "$totalTerlambatKemarin Orang",  Icons.warning_amber_rounded,Colors.orange,),
+                                        _buildInfoCard("Tidak Absen", "${totalPegawai - totalAbsenKemarin} Orang", Icons.cancel,  Colors.red,),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: Card(
-                              elevation: 4, // Menambahkan shadow
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12), // Membuat sudut melengkung
-                              ),
-                              color: Colors.blue[100], // Warna latar belakang yang soft
-                              margin: EdgeInsets.symmetric(vertical: 10, horizontal: 20), // Memberi ruang antar card
-                              child: Padding(
-                                padding: EdgeInsets.all(20), // Padding agar isi tidak terlalu mepet
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "Total Absen Hari Ini",
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue[900], // Warna teks lebih gelap agar kontras
-                                      ),
-                                    ),
-                                    SizedBox(height: 8), // Jarak antar teks
-                                    Text(
-                                      "$totalAbsenHariIni Orang",
-                                      style: TextStyle(
-                                        fontSize: 24, 
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87, // Warna teks utama
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: Card(
-                              elevation: 4, // Menambahkan shadow
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12), // Membuat sudut melengkung
-                              ),
-                              color: Colors.blue[100], // Warna latar belakang yang soft
-                              margin: EdgeInsets.symmetric(vertical: 10, horizontal: 20), // Memberi ruang antar card
-                              child: Padding(
-                                padding: EdgeInsets.all(20), // Padding agar isi tidak terlalu mepet
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "Total Terlambat",
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue[900], // Warna teks lebih gelap agar kontras
-                                      ),
-                                    ),
-                                    SizedBox(height: 8), // Jarak antar teks
-                                    Text(
-                                      "$totalTerlambat Orang",
-                                      style: TextStyle(
-                                        fontSize: 24, 
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87, // Warna teks utama
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
         
                           
                           
                          
-                          // const Text(
-                          //   'Pertumbuhan Kinerja',
-                          //   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19),
-                          // ),
-                          // const SizedBox(height: 12),
-                          // SizedBox(
-                          //   height: 200,
-                          //   child: Padding(
-                          //     padding: const EdgeInsets.symmetric(horizontal: 3),
-                          //     child: LineChart(
-                          //       LineChartData(
-                          //         gridData: FlGridData(show: true),
-                          //         borderData: FlBorderData(
-                          //           show: true,
-                          //           border: const Border(
-                          //             left: BorderSide(color: Colors.black),
-                          //             bottom: BorderSide(color: Colors.black),
-                          //             right: BorderSide(color: Colors.black),
-                          //             top: BorderSide(color: Colors.transparent),
-                          //           ),
-                          //         ),
-                          //         titlesData: FlTitlesData(
-                          //           bottomTitles: AxisTitles(
-                          //             sideTitles: SideTitles(
-                          //               showTitles: true,
-                          //               reservedSize: 28,
-                          //               getTitlesWidget: (value, meta) {
-                          //                 String text;
-                          //                 switch (value.toInt()) {
-                          //                   case 0:
-                          //                     text = 'Jan';
-                          //                     break;
-                          //                   case 1:
-                          //                     text = 'Feb';
-                          //                     break;
-                          //                   case 2:
-                          //                     text = 'Mar';
-                          //                     break;
-                          //                   case 3:
-                          //                     text = 'Apr';
-                          //                     break;
-                          //                   case 4:
-                          //                     text = 'May';
-                          //                     break;
-                          //                   case 5:
-                          //                     text = 'Jun';
-                          //                     break;
-                          //                   case 6:
-                          //                     text = 'Jul';
-                          //                     break;
-                          //                   case 7:
-                          //                     text = 'Aug';
-                          //                     break;
-                          //                   case 8:
-                          //                     text = 'Sep';
-                          //                     break;
-                          //                   case 9:
-                          //                     text = 'Oct';
-                          //                     break;
-                          //                   case 10:
-                          //                     text = 'Nov';
-                          //                     break;
-                          //                   case 11:
-                          //                     text = 'Dec';
-                          //                     break;
-                          //                   default:
-                          //                     text = '';
-                          //                     break;
-                          //                 }
-                          //                 return SideTitleWidget(
-                          //                   axisSide: meta.axisSide,
-                          //                   child: Text(text, style: const TextStyle(fontSize: 12)),
-                          //                 );
-                          //               },
-                          //             ),
-                          //           ),
-                          //           leftTitles: AxisTitles(
-                          //             sideTitles: SideTitles(
-                          //               showTitles: true,
-                          //               reservedSize: 15,
-                          //               getTitlesWidget: (value, meta) {
-                          //                 if (value % 20 == 0) {
-                          //                   return SideTitleWidget(
-                          //                     axisSide: meta.axisSide,
-                          //                     child: Text(value.toInt().toString(), style: const TextStyle(fontSize: 12)),
-                          //                   );
-                          //                 }
-                          //                 return Container(); // Jika bukan kelipatan 20, tidak ditampilkan
-                          //               },
-                          //             ),
-                          //           ),
-                          //         ),
-        
-                          //         lineBarsData: [
-                          //           LineChartBarData(
-                          //             spots: [
-                          //               FlSpot(0, 0),
-                          //               FlSpot(1, 20),
-                          //               FlSpot(2, 50),
-                          //               FlSpot(3, 10),
-                          //               FlSpot(4, 30),
-                          //               FlSpot(5, 60),
-                          //               FlSpot(6, 20),
-                          //               FlSpot(7, 40),
-                          //               FlSpot(8, 80),
-                          //               FlSpot(9, 80),
-                          //               FlSpot(10, 100),
-                          //               FlSpot(11, 90),
-                          //             ],
-                          //             isCurved: true,
-                          //             color: Colors.orange,
-                          //             barWidth: 3,
-                          //           ),
-                          //         ],
-                          //       )
-                          //     ),
-                          //   ),
-                          // ),
-                          // const SizedBox(height: 20),
-        
-                          // SingleChildScrollView(
-                          //   scrollDirection: Axis.horizontal,
-                          //   child: Row(
-                          //     children: [
-                          //       IconButton(
-                          //         icon: const Icon(Icons.arrow_back_ios, size: 16),
-                          //         onPressed: () {},
-                          //       ),
-                          //       _buildCircularProgress('Target', 0.25),
-                          //       const SizedBox(width: 15),
-                          //       _buildCircularProgress('Pengetahuan', 0.25),
-                          //       const SizedBox(width: 15),
-                          //       _buildCircularProgress('Kepemimpinan', 0.25),
-                          //       const SizedBox(width: 15),
-                          //       _buildCircularProgress('Kepatuhan', 0.25),
-                          //       const SizedBox(width: 15),
-                          //       _buildCircularProgress('Kerjasama tim', 0.25),
-                          //       IconButton(
-                          //         icon: const Icon(Icons.arrow_forward_ios, size: 16),
-                          //         onPressed: () {},
-                          //       ),
-                          //     ],
-                          //   ),
-                          // ),
-                        ],
-                      ),
-                    ),
-        
-                    // Ratio Section
-                    // Container(
-                    //   padding: const EdgeInsets.all(20),
-                    //   margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    //   decoration: BoxDecoration(
-                    //     color: Colors.white,
-                    //     borderRadius: BorderRadius.circular(20),
-                    //     boxShadow: [
-                    //       BoxShadow(
-                    //         color: Colors.black.withOpacity(0.1),
-                    //         spreadRadius: 2,
-                    //         blurRadius: 5,
-                    //         offset: const Offset(0, 3),
-                    //       ),
-                    //     ],
-                    //   ),
-                    //   child: Column(
-                    //     crossAxisAlignment: CrossAxisAlignment.start,
-                    //     children: [
-                    //       const Text(
-                    //         'Rasio',
-                    //         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    //       ),
-                    //       const SizedBox(height: 10),
-                    //       SingleChildScrollView(
-                    //         scrollDirection: Axis.horizontal,
-                    //         child: Row(
-                    //           children: [
-                    //             IconButton(
-                    //               icon: const Icon(Icons.arrow_back_ios, size: 16),
-                    //               onPressed: () {},
-                    //             ),
-                    //             const SizedBox(width: 10),
-                    //             _buildCircularRatio('Rasio Kehadiran', 'Terhadap hari kerja', 0.7),
-                    //             const SizedBox(width: 10),
-                    //             _buildCircularRatio('Rasio Izin & Cuti', 'Terhadap ketentuan Internal', 0.7),
-                    //             const SizedBox(width: 10),
-                    //             _buildCircularRatio('Rasio Izin & Cuti', 'Terhadap hari, menit kerja & izin', 0.7),
-                    //             const SizedBox(width: 10),
-                    //             _buildCircularRatio('Rasio Kinerja', 'Kinerja Pencapaian', 0.7),
-                    //             const SizedBox(width: 10),
-                    //             IconButton(
-                    //               icon: const Icon(Icons.arrow_forward_ios, size: 16),
-                    //               onPressed: () {},
-                    //             ),
-                    //           ],
-                    //         ),
-                    //       ),
-                    //     ],
-                    //   ),
-                    // ),
+                       
                   ],
                 ),
               ),
             ],
           ),
         ),
-      );
+      ])));
 
   }
+  String formattedDateYesterday = DateFormat("EEEE, dd MMMM yyyy", "id_ID").format(DateTime.now().subtract(Duration(days: 1)));
+  String formattedDate = DateFormat("EEEE, dd MMMM yyyy", "id_ID").format(DateTime.now());
+  Widget _buildInfoCard(String title, String value, IconData icon, Color iconColor) {
+  return SizedBox(
+    width: 90, // Atur agar tidak mengecil
+    child: Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      color: Colors.white,
+      child: Padding(
+        padding: EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+             Icon(icon, color: iconColor, size: 28),
+             SizedBox(width: 8), 
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue[800],
+              ),
+            ),
+            SizedBox(height: 5),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
   Widget buildMenuItem(String iconPath, String label, Widget targetPage, BuildContext context) {
   return GestureDetector(

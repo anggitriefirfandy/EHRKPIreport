@@ -1,4 +1,4 @@
-name: kpi
+name: ehr_report
 description: "A new Flutter project."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
@@ -18,7 +18,7 @@ dependencies:
   flutter_rating_bar: ^4.0.0
   equatable: ^2.0.5
   shared_preferences: ^2.3.5
-  platform_device_id: ^1.0.1
+  # platform_device_id: ^1.0.1
   device_info_plus: ^11.2.0
   package_info_plus: ^8.1.2
   flutter_easyloading: ^3.0.5
@@ -31,6 +31,7 @@ dependencies:
   awesome_dialog: ^3.2.1
   firebase_crashlytics: ^4.3.0
   intl: ^0.18.0
+  flutter_launcher_icons: ^0.11.0
   
 
 dev_dependencies:
@@ -44,6 +45,8 @@ flutter:
   uses-material-design: true
 
   assets:
+  - assets/images/ehrreport.png
+  - assets/images/fotologin.png
   - assets/images/logo.png
   - assets/images/profile.jpeg
   - assets/images/login.png
@@ -70,5 +73,7 @@ flutter:
   - assets/images/mawareva.jpg
   - assets/images/vino.jpg
   - assets/images/def_img.png
-
-  
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/ehrreport.png"
