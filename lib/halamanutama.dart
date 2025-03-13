@@ -48,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String namaPegawai = '';
   String nip = '';
   String jabatan = '';
+  String shortName = "";
   
   Image _profimg = Image.asset(
     'assets/images/def_img.png',
@@ -85,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
           totalLaki = jsonResponse['total_pegawai_laki'] ?? 0;
           totalAbsenKemarin = jsonResponse['total_absen_kemarin'] ?? 0;
           totalTerlambatKemarin = jsonResponse['total_terlambat_kemarin'] ?? 0;
+          shortName = jsonResponse['short_name'] ?? '';
           isLoading = false;
         });
       } else {
@@ -187,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
-                     Text('CV. ANUGRAH KARYA INDONESIA', style: TextStyle(
+                     Text('${shortName }', style: TextStyle(
                             color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold
                           ),),
                     const SizedBox(height: 20),
