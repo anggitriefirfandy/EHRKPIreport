@@ -45,6 +45,7 @@ flutter:
   uses-material-design: true
 
   assets:
+  - assets/images/iconehrreportss.png
   - assets/images/ehrreport.png
   - assets/images/fotologin.png
   - assets/images/logo.png
@@ -76,4 +77,5 @@ flutter:
 flutter_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/ehrreport.png"
+  remove_alpha_ios: true
+  image_path: "assets/images/iconehrreportss.png"

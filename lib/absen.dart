@@ -8,6 +8,7 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:ehr_report/api/api.dart';
+import 'package:intl/intl.dart';
 
 class AbsensiPage extends StatefulWidget {
   const AbsensiPage({required this.prevPage, super.key});
@@ -206,6 +207,7 @@ void goToPreviousPage() {
     });
   }
 }
+
   @override
   Widget build(BuildContext context) {
     // return Container();
@@ -346,7 +348,13 @@ class AbsensiCard extends StatelessWidget {
                    Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => AbsensiDetailPage(pegawaiId: absensi.pegawai_id),
+                      builder: (context) => AbsensiDetailPage(pegawaiId: absensi.pegawai_id,
+                      nama: absensi.nama,
+          jabatan: absensi.jabatan,
+          nip: absensi.nip,
+          cabang: absensi.cabang,
+          profil: absensi.profil,
+          usia: absensi.usia),
                     ),
                   );
                 },
@@ -642,8 +650,21 @@ class AbsensiBulanData {
 
 class AbsensiDetailPage extends StatefulWidget {
   final String pegawaiId;
+  final String nama;
+  final String jabatan;
+  final String nip;
+  final String cabang;
+  final String usia;
+  final String profil;
   //  final AbsensiData absensiData;
-  const AbsensiDetailPage({required this.pegawaiId, Key? key}) : super(key: key);
+  const AbsensiDetailPage({required this.pegawaiId,
+  required this.nama,
+    required this.jabatan,
+    required this.nip,
+    required this.cabang,
+    required this.profil,
+    required this.usia,
+     Key? key}) : super(key: key);
   @override
   _AbsensiDetailPageState createState() => _AbsensiDetailPageState();
 }
@@ -694,6 +715,10 @@ class _AbsensiDetailPageState extends State<AbsensiDetailPage> {
     setState(() => isLoading = false);
   }
 }
+String _formatBulanTahun(String bulanTahun) {
+  DateTime date = DateTime.parse('$bulanTahun-01'); // Tambah tanggal agar bisa diparsing
+  return DateFormat("MMMM yyyy", "id_ID").format(date);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -727,9 +752,9 @@ class _AbsensiDetailPageState extends State<AbsensiDetailPage> {
                           color: Colors.blueAccent,
                           borderRadius: BorderRadius.circular(30),
                           image: DecorationImage(
-                            image: (detailAbsensiData?.avatar ?? '').isNotEmpty &&
-                              Uri.tryParse(detailAbsensiData?.avatar ?? '')?.hasAbsolutePath == true
-                          ? NetworkImage(detailAbsensiData!.avatar) // Gunakan ! karena sudah dicek null-nya
+                            image: (widget.profil ?? '').isNotEmpty &&
+                              Uri.tryParse(widget.profil ?? '')?.hasAbsolutePath == true
+                          ? NetworkImage(widget!.profil) // Gunakan ! karena sudah dicek null-nya
                           : const AssetImage('assets/images/profile.jpeg') as ImageProvider,
                           fit: BoxFit.cover
                           ),
@@ -741,13 +766,13 @@ class _AbsensiDetailPageState extends State<AbsensiDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${detailAbsensiData?.nama}',
+                        '${widget.nama}',
                         style:
                             TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                       SizedBox(height: 4),
                       Text(
-                        '${detailAbsensiData?.jabatan_pegawai}',
+                        '${widget.jabatan}',
                         style: TextStyle(
                           fontSize: 14,
                           color: Color(0xFF007BFF),
@@ -755,15 +780,15 @@ class _AbsensiDetailPageState extends State<AbsensiDetailPage> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'NIP: ${detailAbsensiData?.nip}',
+                        'NIP: ${widget.nip}',
                         style: TextStyle(fontSize: 14),
                       ),
                       Text(
-                        'Usia : ${detailAbsensiData?.usia} Tahun',
+                        'Usia : ${widget.usia} Tahun',
                         style: TextStyle(fontSize: 14),
                       ),
                       Text(
-                        'Kantor : ${detailAbsensiData?.kantor_cabang_pegawai}',
+                        'Kantor : ${widget.cabang}',
                         style: TextStyle(fontSize: 14),
                       ),
                       SizedBox(height: 4),
@@ -806,27 +831,27 @@ class _AbsensiDetailPageState extends State<AbsensiDetailPage> {
 
             SizedBox(height: 20),
             if (absensiBulanData != null && absensiBulanData!.isNotEmpty)
-  Expanded(
-    child: Table(
-      border: TableBorder.all(color: Colors.grey), // Adds borders to the table
-      columnWidths: const <int, TableColumnWidth>{
-        0: FlexColumnWidth(2), // Width for the month column
-        1: FlexColumnWidth(1), // Width for the hadir (attendance) column
-        // 2: FlexColumnWidth(1), // Width for the cuti (leave) column
-      },
-      children: [
-        _buildTableHeaderRow(), // Table header
-        ...absensiBulanData!.map((data) => _buildTableRow(data)).toList(), // Map each data to table rows
-      ],
-    ),
-  ),
-            // Add spacing before attendance section
-            // _buildAttendanceTable()
-          ],
-        ),
+    Expanded(
+      child: Table(
+        border: TableBorder.all(color: Colors.grey), // Adds borders to the table
+        columnWidths: const <int, TableColumnWidth>{
+          0: FlexColumnWidth(2), // Width for the month column
+          1: FlexColumnWidth(1), // Width for the hadir (attendance) column
+          // 2: FlexColumnWidth(1), // Width for the cuti (leave) column
+        },
+        children: [
+          _buildTableHeaderRow(), // Table header
+          ...absensiBulanData!.map((data) => _buildTableRow(data)).toList(), // Map each data to table rows
+        ],
       ),
-    );
-  }
+    ),
+              // Add spacing before attendance section
+              // _buildAttendanceTable()
+            ],
+          ),
+        ),
+      );
+    }
 
   TableRow _buildTableRow(AbsensiBulanData data) {
   return TableRow(
@@ -834,7 +859,7 @@ class _AbsensiDetailPageState extends State<AbsensiDetailPage> {
       Padding(
         padding: const EdgeInsets.all(8.0),
         child: Text(
-          data.bulanTahun, // Display the month
+          _formatBulanTahun(data.bulanTahun),
           style: TextStyle(fontSize: 14, color: Colors.black),
           textAlign: TextAlign.center,
         ),

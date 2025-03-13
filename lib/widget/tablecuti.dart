@@ -92,7 +92,7 @@ Widget build(BuildContext context) {
         : dataCuti.isEmpty
             ? Center(child: Text('Tidak ada data cuti'))
             : SizedBox(
-                height: MediaQuery.of(context).size.height * 0.6, // Batasi tinggi maksimal
+                height: MediaQuery.of(context).size.height * 0.5, // Batasi tinggi maksimal
                 child: ListView.builder(
                   shrinkWrap: true,
                   physics: AlwaysScrollableScrollPhysics(), // Tambahkan scrolling

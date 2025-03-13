@@ -1,4 +1,4 @@
-package com.example.kpi
+package com.akarindo.ehrreport
 
 import io.flutter.embedding.android.FlutterActivity
 

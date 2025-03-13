@@ -503,19 +503,42 @@ class _CutiDetailPageState extends State<CutiDetailPage> {
                 ),
                 const SizedBox(width: 10), // Memberikan jarak antara gambar dan teks
                 // Teks Profil
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${widget.leaveData.nama}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    Text('${widget.leaveData.jabatan}', style: const TextStyle(fontSize: 16)),
-                    Text('NIP: ${widget.leaveData.nip}', style: const TextStyle(fontSize: 16)),
-                    Text('Usia: ${widget.leaveData.usia}', style: const TextStyle(fontSize: 16)),
-                    Text('Kantor: ${widget.leaveData.kantorCabang}', style: const TextStyle(fontSize: 16)),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${widget.leaveData.nama}',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis, // Tambahkan ini agar teks yang panjang dipotong
+                        maxLines: 1, // Batasi ke 1 baris
+                      ),
+                      Text(
+                        '${widget.leaveData.jabatan}',
+                        style: const TextStyle(fontSize: 16),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      Text(
+                        'NIP: ${widget.leaveData.nip}',
+                        style: const TextStyle(fontSize: 16),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      Text(
+                        'Usia: ${widget.leaveData.usia}',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      Text(
+                        'Kantor: ${widget.leaveData.kantorCabang}',
+                        style: const TextStyle(fontSize: 16),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ],
+                  ),
                 ),
+
               ],
             ),
 

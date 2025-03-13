@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ehr_report/api/api.dart';
 import 'package:ehr_report/halamanutama.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
@@ -25,6 +26,18 @@ class _LoginPageState extends State<LoginPage> {
   int _constat = 1; // Misalnya, 1 berarti koneksi tersedia
   String _errorMessage = '';
   bool _isObscure = true;
+  String _appVer = '0';
+  @override
+  void initState() {
+    super.initState();
+    _getAppVersion();
+  }
+  Future<void> _getAppVersion() async {
+    PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _appVer = packageInfo.version;
+    });
+  }
 
   // Fungsi login
   void _login() async {
@@ -222,7 +235,7 @@ class _LoginPageState extends State<LoginPage> {
 
                     // Versi aplikasi
                     Text(
-                      'version 0.1',
+                      'EHR Report V$_appVer',
                       style: GoogleFonts.poppins(
                         color: Colors.grey,
                         fontSize: 12,
