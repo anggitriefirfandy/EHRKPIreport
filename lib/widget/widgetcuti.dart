@@ -41,6 +41,7 @@ class _WidgetcutiState extends State<Widgetcuti> {
 
     if (response.statusCode == 200) {
       var jsonResponse = jsonDecode(response.body);
+      debugPrint('Mengirim request ke API: ${response.body}', wrapWidth: 1034);
 
       if (jsonResponse is Map<String, dynamic> && jsonResponse.containsKey('data')) {
         var dataMap = jsonResponse['data'];
@@ -48,7 +49,7 @@ class _WidgetcutiState extends State<Widgetcuti> {
         if (dataMap is Map<String, dynamic>) {
           setState(() {
             maxCuti = dataMap['maxcuti'] ?? 0;
-            countCuti = dataMap['count_cuti'] ?? 0;
+            countCuti = dataMap['countcuti'] ?? 0;
             isLoading = false;
           });
 
